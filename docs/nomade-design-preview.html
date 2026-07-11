@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nomade — Design System Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F8F8F5;
+    --surface: #FFFFFF;
+    --text-primary: #111111;
+    --text-secondary: #555555;
+    --text-tertiary: #888888;
+    --accent: #4945C2;
+    --accent-light: #EEEEF9;
+    --border: #E8E8E8;
+    --success: #16A34A;
+    --success-light: #DCFCE7;
+    --warning: #D97706;
+    --warning-light: #FEF3C7;
+    --error: #DC2626;
+    --error-light: #FEE2E2;
+    --font: 'Geist', system-ui, -apple-system, sans-serif;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-pill: 9999px;
+  }
+  [data-theme="dark"] {
+    --bg: #0E0E0C;
+    --surface: #1A1A18;
+    --text-primary: #EFEFEC;
+    --text-secondary: #AAAAAA;
+    --text-tertiary: #666666;
+    --accent: #7B78E8;
+    --accent-light: #2A2945;
+    --border: #2A2A28;
+    --success: #22C55E;
+    --success-light: #14532D;
+    --warning: #F59E0B;
+    --warning-light: #451A03;
+    --error: #EF4444;
+    --error-light: #450A0A;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text-primary);
+    font-size: 16px;
+    line-height: 1.5;
+    transition: background 0.2s, color 0.2s;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  .header {
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .logo { font-size: 24px; font-weight: 700; letter-spacing: -0.04em; color: var(--text-primary); }
+  .header-meta { font-size: 12px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
+  .toggle-btn {
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toggle-btn:hover { border-color: var(--text-primary); color: var(--text-primary); }
+
+  /* Section */
+  .section { margin-bottom: 64px; }
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    margin-bottom: 24px;
+  }
+  h2.section-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    margin-bottom: 24px;
+  }
+
+  /* Typography Specimen */
+  .type-scale { display: flex; flex-direction: column; gap: 20px; }
+  .type-row { padding: 20px 0; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 24px; }
+  .type-row:last-child { border-bottom: none; }
+  .type-meta { font-size: 11px; color: var(--text-tertiary); min-width: 140px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .type-sample { color: var(--text-primary); }
+  .display { font-size: 40px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; }
+  .heading { font-size: 24px; font-weight: 600; letter-spacing: -0.03em; }
+  .subheading { font-size: 18px; font-weight: 500; letter-spacing: -0.02em; }
+  .body { font-size: 15px; font-weight: 400; line-height: 1.6; }
+  .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); }
+  .caption { font-size: 12px; font-weight: 400; color: var(--text-tertiary); }
+  .data { font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .mono { font-size: 13px; font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  /* Colors */
+  .palette { display: flex; flex-wrap: wrap; gap: 16px; }
+  .swatch { flex: 1; min-width: 120px; }
+  .swatch-color { height: 80px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 8px; }
+  .swatch-name { font-size: 12px; font-weight: 500; color: var(--text-primary); margin-bottom: 2px; }
+  .swatch-hex { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+  .contrast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .contrast-pair {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .contrast-bg { padding: 16px; }
+  .contrast-bg p { font-size: 14px; }
+  .contrast-meta { padding: 8px 12px; background: var(--surface); font-size: 11px; color: var(--text-tertiary); border-top: 1px solid var(--border); }
+
+  /* Components */
+  .components-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 600px) { .components-grid { grid-template-columns: 1fr; } }
+  .component-group { display: flex; flex-direction: column; gap: 12px; }
+  .component-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-tertiary); font-weight: 600; margin-bottom: 4px; }
+
+  /* Button */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font); font-size: 15px; font-weight: 600;
+    padding: 14px 20px; border-radius: var(--radius-lg);
+    border: 1.5px solid transparent; cursor: pointer;
+    text-align: center; width: 100%; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--text-primary); color: var(--bg); border-color: var(--text-primary); }
+  .btn-secondary { background: var(--surface); color: var(--text-primary); border-color: var(--border); }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border-color: transparent; }
+  .btn-disabled { background: var(--border); color: var(--text-tertiary); border-color: var(--border); cursor: not-allowed; }
+  .btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
+
+  /* Badge */
+  .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .badge-personalized { background: var(--accent-light); color: var(--accent); }
+  .badge-time { background: #F0F0F0; color: #555; }
+  .badge-cost { background: #FFF3E0; color: #9A4500; }
+  .badge-important { background: var(--error-light); color: var(--error); }
+
+  /* Task item */
+  .task-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .task-check {
+    width: 22px; height: 22px; flex-shrink: 0; margin-top: 1px;
+    border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .task-check.checked { background: var(--text-primary); border-color: var(--text-primary); }
+  .task-check.checked::after { content: '✓'; color: var(--bg); font-size: 13px; font-weight: 700; }
+  .task-name { font-size: 14px; font-weight: 500; margin-bottom: 2px; color: var(--text-primary); }
+  .task-name.done { text-decoration: line-through; color: var(--text-tertiary); }
+  .task-detail { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .task-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Progress bar */
+  .progress-bar { height: 5px; background: var(--border); border-radius: var(--radius-pill); overflow: hidden; margin-bottom: 24px; }
+  .progress-fill { height: 100%; background: var(--text-primary); border-radius: var(--radius-pill); transition: width 0.3s ease; }
+
+  /* Quiz option */
+  .quiz-option {
+    border: 1.5px solid var(--border); border-radius: var(--radius-lg);
+    padding: 14px 16px; cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color 0.15s;
+  }
+  .quiz-option.selected { border-color: var(--text-primary); background: #FAFAFA; }
+  [data-theme="dark"] .quiz-option.selected { background: var(--surface); }
+  .quiz-radio {
+    width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 50%;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .quiz-option.selected .quiz-radio { border-color: var(--text-primary); }
+  .quiz-radio-dot { width: 10px; height: 10px; background: var(--text-primary); border-radius: 50%; }
+  .quiz-option-text { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+  .quiz-option-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Country card */
+  .country-card {
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; background: var(--surface);
+    position: relative;
+  }
+  .country-card.featured { border: 1.5px solid var(--text-primary); }
+  .country-flag { font-size: 28px; margin-bottom: 8px; display: block; }
+  .country-name { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 3px; color: var(--text-primary); }
+  .country-visa { font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px; }
+  .country-stats { display: flex; gap: 20px; }
+  .stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; color: var(--text-tertiary); margin-bottom: 2px; }
+  .stat-value { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+  .country-badge-pill {
+    position: absolute; top: 16px; right: 16px;
+    font-size: 10px; font-weight: 600; background: var(--text-primary);
+    color: var(--bg); padding: 3px 10px; border-radius: var(--radius-pill);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+
+  /* Phone mockups */
+  .mockups { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; }
+  .phone-frame {
+    width: 320px; min-height: 620px; border: 1.5px solid var(--border);
+    border-radius: 36px; background: var(--surface);
+    overflow: hidden; position: relative; padding: 48px 0 28px;
+    flex-shrink: 0;
+  }
+  .phone-notch {
+    width: 100px; height: 22px; background: var(--border);
+    border-radius: 0 0 16px 16px; position: absolute; top: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+  .phone-bar {
+    width: 90px; height: 4px; background: var(--border); border-radius: 2px;
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  }
+  .phone-screen { padding: 16px; height: 100%; overflow: hidden; }
+  .phone-label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--text-tertiary); text-align: center; margin-bottom: 20px; font-weight: 600;
+  }
+
+  /* Phase label */
+  .phase-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    font-weight: 600; color: var(--text-tertiary); margin-bottom: 8px;
+  }
+
+  /* AI helper */
+  .ai-drawer {
+    border: 1px dashed var(--border); border-radius: var(--radius-lg);
+    padding: 14px; margin-top: 16px; background: var(--surface);
+  }
+  .ai-question { font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px; }
+  .ai-answer { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .ai-citation { font-size: 11px; color: var(--accent); margin-top: 6px; }
+
+  /* Input */
+  .input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg); font-family: var(--font); font-size: 14px;
+    background: var(--surface); color: var(--text-primary);
+    outline: none; transition: border-color 0.15s;
+  }
+  .input:focus { border-color: var(--text-primary); }
+
+  /* Spacing demo */
+  .spacing-demo { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .space-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .space-block { background: var(--accent-light); border-radius: var(--radius-sm); width: 100%; }
+  .space-label { font-size: 10px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+  /* Semantic */
+  .semantic-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .semantic-card {
+    padding: 14px; border-radius: var(--radius-lg); border: 1px solid transparent;
+  }
+  .semantic-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .semantic-body { font-size: 11px; }
+  .sem-success { background: var(--success-light); color: var(--success); border-color: #86EFAC; }
+  .sem-warning { background: var(--warning-light); color: var(--warning); border-color: #FDE68A; }
+  .sem-error { background: var(--error-light); color: var(--error); border-color: #FCA5A5; }
+  .sem-info { background: var(--accent-light); color: var(--accent); border-color: #C7D2FE; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <div class="logo">nomade</div>
+      <div class="header-meta" style="margin-top:4px">Design System Preview · Geist / #4945C2 / Editorial Precision</div>
+    </div>
+    <button class="toggle-btn" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? '' : 'dark'">
+      Toggle dark mode
+    </button>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <div class="section">
+    <div class="section-label">01 — Typography</div>
+    <div class="type-scale">
+      <div class="type-row">
+        <div class="type-meta">Display / 40px / 700<br>logo, hero</div>
+        <div class="type-sample display">nomade</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">Heading / 24px / 600<br>screen titles</div>
+        <div class="type-sample heading">Your Italy Plan</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">Subheading / 18px / 500<br>section titles</div>
+        <div class="type-sample subheading">Phase 1 — Gather Documents</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">Body / 15px / 400<br>descriptions, details</div>
+        <div class="type-sample body">Tax returns, invoices, or bank statements showing €28,000+/yr income. If you invoice clients directly, three months of statements are typically sufficient. Apostille required for non-EU applicants.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">Label / 12px / 600 / UC<br>phase labels, tags</div>
+        <div class="type-sample label">Gather Documents</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">Caption / 12px / 400<br>metadata, hints</div>
+        <div class="type-sample caption">Free · 5 min quiz · No account needed</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">Data / 15px / 500 / tabular<br>financial figures</div>
+        <div class="type-sample data" style="font-variant-numeric:tabular-nums">
+          €28,000/yr &nbsp;·&nbsp; €50–150/mo &nbsp;·&nbsp; 3–6 months &nbsp;·&nbsp; 2–8 weeks
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- COLORS -->
+  <div class="section">
+    <div class="section-label">02 — Color Palette</div>
+    <div class="palette" style="margin-bottom:32px">
+      <div class="swatch">
+        <div class="swatch-color" style="background:#111111"></div>
+        <div class="swatch-name">Text Primary</div>
+        <div class="swatch-hex">#111111</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#555555"></div>
+        <div class="swatch-name">Text Secondary</div>
+        <div class="swatch-hex">#555555</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#888888"></div>
+        <div class="swatch-name">Text Tertiary</div>
+        <div class="swatch-hex">#888888</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#4945C2"></div>
+        <div class="swatch-name">Accent</div>
+        <div class="swatch-hex">#4945C2</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#EEEEF9; border:1px solid #E8E8E8"></div>
+        <div class="swatch-name">Accent Light</div>
+        <div class="swatch-hex">#EEEEF9</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#F8F8F5; border:1px solid #E8E8E8"></div>
+        <div class="swatch-name">Background</div>
+        <div class="swatch-hex">#F8F8F5</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#FFFFFF; border:1px solid #E8E8E8"></div>
+        <div class="swatch-name">Surface</div>
+        <div class="swatch-hex">#FFFFFF</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-color" style="background:#E8E8E8"></div>
+        <div class="swatch-name">Border</div>
+        <div class="swatch-hex">#E8E8E8</div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-bottom:16px">Contrast pairs (WCAG AA minimum 4.5:1)</div>
+    <div class="contrast-grid">
+      <div class="contrast-pair">
+        <div class="contrast-bg" style="background:#F8F8F5">
+          <p style="color:#111111;font-size:14px;font-weight:500">Primary text</p>
+          <p style="color:#111111;font-size:12px">Valid passport (6+ months)</p>
+        </div>
+        <div class="contrast-meta">#111 on #F8F8F5 — 17.9:1 AAA ✓</div>
+      </div>
+      <div class="contrast-pair">
+        <div class="contrast-bg" style="background:#F8F8F5">
+          <p style="color:#555555;font-size:14px;font-weight:400">Secondary text</p>
+          <p style="color:#555555;font-size:12px">Must not expire before visa end</p>
+        </div>
+        <div class="contrast-meta">#555 on #F8F8F5 — 5.7:1 AA ✓</div>
+      </div>
+      <div class="contrast-pair">
+        <div class="contrast-bg" style="background:#F8F8F5">
+          <p style="color:#888888;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">GATHER DOCUMENTS</p>
+        </div>
+        <div class="contrast-meta">#888 on #F8F8F5 — 3.8:1 AA large ✓</div>
+      </div>
+      <div class="contrast-pair">
+        <div class="contrast-bg" style="background:#EEEEF9">
+          <p style="color:#4945C2;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">PERSONALIZED FOR YOU</p>
+        </div>
+        <div class="contrast-meta">#4945C2 on #EEEEF9 — 5.1:1 AA ✓</div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-top:32px;margin-bottom:16px">Semantic colors</div>
+    <div class="semantic-grid">
+      <div class="semantic-card sem-success">
+        <div class="semantic-title">Success</div>
+        <div class="semantic-body">Task completed</div>
+      </div>
+      <div class="semantic-card sem-warning">
+        <div class="semantic-title">Warning</div>
+        <div class="semantic-body">Verify this info</div>
+      </div>
+      <div class="semantic-card sem-error">
+        <div class="semantic-title">Important</div>
+        <div class="semantic-body">Required at consulate</div>
+      </div>
+      <div class="semantic-card sem-info">
+        <div class="semantic-title">Personalized</div>
+        <div class="semantic-body">Tailored for you</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- COMPONENTS -->
+  <div class="section">
+    <div class="section-label">03 — Components</div>
+    <div class="components-grid">
+      <div class="component-group">
+        <div class="component-label">Buttons</div>
+        <button class="btn btn-primary">Start My Italy Guide →</button>
+        <button class="btn btn-secondary">Edit answers</button>
+        <button class="btn btn-disabled" disabled>Continue → (disabled)</button>
+        <button class="btn btn-primary" style="background:transparent;color:var(--text-primary);border-color:var(--border)">← Back</button>
+      </div>
+
+      <div class="component-group">
+        <div class="component-label">Badges</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+          <span class="badge badge-personalized">Personalized for you</span>
+          <span class="badge badge-time">~1 week to arrange</span>
+          <span class="badge badge-cost">€50–150/mo</span>
+          <span class="badge badge-important">Required</span>
+        </div>
+
+        <div class="component-label" style="margin-top:8px">Task items</div>
+        <div class="task-item">
+          <div class="task-check checked"></div>
+          <div>
+            <div class="task-name done">Valid passport (6+ months)</div>
+            <div class="task-detail">Must not expire before visa end date</div>
+          </div>
+        </div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div>
+            <div class="task-name">Proof of income — freelancer</div>
+            <div class="task-detail">Tax returns, invoices, or bank statements showing €28,000+/yr</div>
+            <div class="task-badges" style="margin-top:4px">
+              <span class="badge badge-personalized">Personalized for you</span>
+            </div>
+          </div>
+        </div>
+        <div class="task-item">
+          <div class="task-check"></div>
+          <div>
+            <div class="task-name">Health insurance (Italy-valid)</div>
+            <div class="task-detail">Must cover full stay, accepted by Italian authorities</div>
+            <div class="task-badges" style="margin-top:4px">
+              <span class="badge badge-cost">€50–150/mo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="component-group">
+        <div class="component-label">Quiz options</div>
+        <div class="quiz-option selected">
+          <div class="quiz-radio"><div class="quiz-radio-dot"></div></div>
+          <div>
+            <div class="quiz-option-text">Freelancer / Self-employed</div>
+            <div class="quiz-option-desc">You invoice clients directly, no single employer</div>
+          </div>
+        </div>
+        <div class="quiz-option">
+          <div class="quiz-radio"></div>
+          <div>
+            <div class="quiz-option-text">Remote employee</div>
+            <div class="quiz-option-desc">You work for a company that pays your salary</div>
+          </div>
+        </div>
+        <div class="quiz-option">
+          <div class="quiz-radio"></div>
+          <div>
+            <div class="quiz-option-text">Business owner</div>
+            <div class="quiz-option-desc">You own a registered business or LLC</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="component-group">
+        <div class="component-label">Country card</div>
+        <div class="country-card featured">
+          <div class="country-badge-pill">Full Guide</div>
+          <span class="country-flag">🇮🇹</span>
+          <div class="country-name">Italy</div>
+          <div class="country-visa">Digital Nomad Visa (Visto per Nomadi Digitali)</div>
+          <div class="country-stats">
+            <div>
+              <div class="stat-label">Min. Income</div>
+              <div class="stat-value">€28,000/yr</div>
+            </div>
+            <div>
+              <div class="stat-label">Duration</div>
+              <div class="stat-value">Up to 1 yr</div>
+            </div>
+            <div>
+              <div class="stat-label">Timeline</div>
+              <div class="stat-value">3–6 months</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="component-label" style="margin-top:16px">AI contextual drawer</div>
+        <div class="ai-drawer">
+          <div class="ai-question">What counts as proof of income for freelancers?</div>
+          <div class="ai-answer">For freelancers, Italian consulates typically accept: tax returns (last 2 years), client invoices showing total revenue, or bank statements showing €28K+ in deposits. Statements should be officially certified or apostilled if issued outside Italy.</div>
+          <div class="ai-citation">Based on Italy YAML data + consulate guidance ↗</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- SPACING -->
+  <div class="section">
+    <div class="section-label">04 — Spacing (4px base grid)</div>
+    <div class="spacing-demo">
+      <div class="space-item">
+        <div class="space-block" style="height:4px;width:24px"></div>
+        <div class="space-label">4px / xs</div>
+      </div>
+      <div class="space-item">
+        <div class="space-block" style="height:8px;width:24px"></div>
+        <div class="space-label">8px / sm</div>
+      </div>
+      <div class="space-item">
+        <div class="space-block" style="height:12px;width:24px"></div>
+        <div class="space-label">12px</div>
+      </div>
+      <div class="space-item">
+        <div class="space-block" style="height:16px;width:24px"></div>
+        <div class="space-label">16px / md</div>
+      </div>
+      <div class="space-item">
+        <div class="space-block" style="height:24px;width:24px"></div>
+        <div class="space-label">24px / lg</div>
+      </div>
+      <div class="space-item">
+        <div class="space-block" style="height:32px;width:24px"></div>
+        <div class="space-label">32px / xl</div>
+      </div>
+      <div class="space-item">
+        <div class="space-block" style="height:48px;width:24px"></div>
+        <div class="space-label">48px / 2xl</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- MOCKUPS -->
+  <div class="section">
+    <div class="section-label">05 — Screen mockups</div>
+    <div class="mockups">
+
+      <!-- Landing -->
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-label">Screen 1 — Landing</div>
+          <div style="text-align:center;margin-bottom:4px">
+            <div style="font-size:22px;font-weight:700;letter-spacing:-0.04em;color:var(--text-primary)">nomade</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:24px">Your visa, decoded. Step by step.</div>
+          </div>
+          <div class="country-card featured" style="margin-bottom:12px">
+            <div class="country-badge-pill">Full Guide</div>
+            <span class="country-flag" style="font-size:22px">🇮🇹</span>
+            <div class="country-name" style="font-size:15px">Italy</div>
+            <div class="country-visa" style="font-size:10px;margin-bottom:10px">Digital Nomad Visa</div>
+            <div class="country-stats">
+              <div><div class="stat-label" style="font-size:8px">Min. Income</div><div class="stat-value" style="font-size:11px">€28,000/yr</div></div>
+              <div><div class="stat-label" style="font-size:8px">Duration</div><div class="stat-value" style="font-size:11px">Up to 1 yr</div></div>
+              <div><div class="stat-label" style="font-size:8px">Timeline</div><div class="stat-value" style="font-size:11px">3–6 mo</div></div>
+            </div>
+          </div>
+          <div class="country-card" style="opacity:0.35;margin-bottom:8px">
+            <span class="country-flag" style="font-size:18px">🇵🇹</span>
+            <div class="country-name" style="font-size:14px">Portugal</div>
+            <div class="country-visa" style="font-size:10px">D7 / D8 Visa</div>
+            <div class="country-badge-pill" style="position:absolute;top:12px;right:12px;background:#ccc;color:#666;font-size:9px">Coming Soon</div>
+          </div>
+          <button class="btn btn-primary" style="font-size:13px;padding:12px 16px;margin-top:16px">Start My Italy Guide →</button>
+          <div style="text-align:center;font-size:10px;color:var(--text-tertiary);margin-top:6px">Free · 5 min quiz · No account needed</div>
+        </div>
+        <div class="phone-bar"></div>
+      </div>
+
+      <!-- Quiz -->
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-label">Screen 2 — Quiz</div>
+          <div style="display:flex;gap:5px;margin-bottom:20px">
+            <div style="height:3px;background:var(--text-primary);border-radius:2px;flex:1"></div>
+            <div style="height:3px;background:var(--text-primary);border-radius:2px;flex:1"></div>
+            <div style="height:3px;background:var(--accent);border-radius:2px;flex:1"></div>
+            <div style="height:3px;background:var(--border);border-radius:2px;flex:1"></div>
+            <div style="height:3px;background:var(--border);border-radius:2px;flex:1"></div>
+          </div>
+          <div style="font-size:17px;font-weight:600;letter-spacing:-0.02em;margin-bottom:6px;color:var(--text-primary)">How do you earn your income?</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:20px;line-height:1.4">This determines which documents you'll need to prove your work situation to Italian authorities.</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="quiz-option selected" style="padding:10px 12px">
+              <div class="quiz-radio" style="width:16px;height:16px"><div class="quiz-radio-dot" style="width:8px;height:8px"></div></div>
+              <div>
+                <div class="quiz-option-text" style="font-size:13px">Freelancer / Self-employed</div>
+                <div class="quiz-option-desc" style="font-size:11px">You invoice clients directly</div>
+              </div>
+            </div>
+            <div class="quiz-option" style="padding:10px 12px">
+              <div class="quiz-radio" style="width:16px;height:16px"></div>
+              <div>
+                <div class="quiz-option-text" style="font-size:13px">Remote employee</div>
+                <div class="quiz-option-desc" style="font-size:11px">Salaried by a company</div>
+              </div>
+            </div>
+            <div class="quiz-option" style="padding:10px 12px">
+              <div class="quiz-radio" style="width:16px;height:16px"></div>
+              <div>
+                <div class="quiz-option-text" style="font-size:13px">Business owner</div>
+                <div class="quiz-option-desc" style="font-size:11px">You own a registered business</div>
+              </div>
+            </div>
+            <div class="quiz-option" style="padding:10px 12px">
+              <div class="quiz-radio" style="width:16px;height:16px"></div>
+              <div>
+                <div class="quiz-option-text" style="font-size:13px">Mixed income</div>
+                <div class="quiz-option-desc" style="font-size:11px">Freelance + employment</div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="font-size:13px;padding:12px;margin-top:20px">Continue →</button>
+        </div>
+        <div class="phone-bar"></div>
+      </div>
+
+      <!-- Checklist -->
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-label">Screen 3 — Checklist</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-size:17px;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary)">Your Italy Plan</div>
+            <div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-primary)">25%</div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
+          <div class="phase-label">Phase 1 — Gather Documents</div>
+          <div class="task-item">
+            <div class="task-check checked"></div>
+            <div>
+              <div class="task-name done" style="font-size:13px">Valid passport (6+ months)</div>
+              <div class="task-detail" style="font-size:11px">Must not expire before visa end</div>
+            </div>
+          </div>
+          <div class="task-item">
+            <div class="task-check checked"></div>
+            <div>
+              <div class="task-name done" style="font-size:13px">Proof of income</div>
+              <div class="task-detail" style="font-size:11px">Tax returns or invoices, €28K+/yr</div>
+              <div style="margin-top:3px"><span class="badge badge-personalized" style="font-size:9px">Personalized for you</span></div>
+            </div>
+          </div>
+          <div class="task-item">
+            <div class="task-check"></div>
+            <div>
+              <div class="task-name" style="font-size:13px">Health insurance (Italy-valid)</div>
+              <div class="task-detail" style="font-size:11px">Must cover full stay</div>
+              <div style="margin-top:3px"><span class="badge badge-cost" style="font-size:9px">€50–150/mo</span></div>
+            </div>
+          </div>
+          <div class="task-item">
+            <div class="task-check"></div>
+            <div>
+              <div class="task-name" style="font-size:13px">Proof of accommodation</div>
+              <div class="task-detail" style="font-size:11px">Rental contract or booking</div>
+              <div style="margin-top:3px"><span class="badge badge-time" style="font-size:9px">~1 week to arrange</span></div>
+            </div>
+          </div>
+          <!-- Floating AI button -->
+          <div style="position:relative;margin-top:12px">
+            <div style="position:absolute;right:0;bottom:0;width:40px;height:40px;background:var(--text-primary);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--bg);font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.15)">💬</div>
+          </div>
+        </div>
+        <div class="phone-bar"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:32px 0 48px;font-size:12px;color:var(--text-tertiary)">
+    Nomade Design System · Generated by /design-consultation · 2026-03-21
+  </div>
+</div>
+</body>
+</html>

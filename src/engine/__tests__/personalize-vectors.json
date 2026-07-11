@@ -1,0 +1,165 @@
+{
+  "_comment": "Shared TS<->Swift parity vectors for the personalization engine. Canonical copy lives here (web repo, alongside the TS engine + CI). scripts/sync-test-vectors.mjs copies this verbatim into the iOS test bundle (NomadeTests/Fixtures/) so both engines assert against identical bytes. Edit here, then run `npm run gen:test-vectors`.",
+  "country": {
+    "country": "Italy",
+    "visa_name": "Digital Nomad Visa (Visto per Nomadi Digitali)",
+    "emoji": "🇮🇹",
+    "min_income": 28000,
+    "duration": "Up to 1 year (renewable)",
+    "processing_time": "3-6 months",
+    "last_verified": "2026-03-22",
+    "sources": ["https://vistoperitalia.esteri.it"],
+    "phases": [
+      {
+        "name": "Gather Documents",
+        "tasks": [
+          {
+            "id": "passport",
+            "name": "Valid passport (6+ months remaining)",
+            "detail": "Must not expire before your visa end date.",
+            "universal": true
+          },
+          {
+            "id": "proof-of-income",
+            "name": "Proof of income",
+            "default_detail": "Documents proving €28,000+/yr stable income",
+            "tags": ["personalized"],
+            "conditions": [
+              {
+                "if": { "income_type": "freelancer" },
+                "detail": "Tax returns + invoices + bank statements (€28K+/yr)"
+              },
+              {
+                "if": { "income_type": "employee" },
+                "detail": "Employment contract + last 3 months of pay stubs"
+              },
+              {
+                "if": { "income_type": "business_owner" },
+                "detail": "Business registration + financial statements"
+              },
+              {
+                "if": { "income_type": "mixed" },
+                "detail": "Tax returns + invoices AND/OR employment contract (provide whichever applies)"
+              },
+              {
+                "if": { "income_type": "freelancer", "nationality_group": "non-EU" },
+                "detail": "Tax returns + invoices + bank statements (€28K+/yr) + apostille + Italian translation"
+              }
+            ]
+          },
+          {
+            "id": "dependent-permesso",
+            "name": "Apply for dependent family Permesso di Soggiorno",
+            "hidden_unless_matched": true,
+            "tags": ["personalized"],
+            "conditions": [
+              {
+                "if": { "traveling_with": "with_partner" },
+                "detail": "Your partner needs their own Permesso. Additional income: €8,400/yr per dependent."
+              },
+              {
+                "if": { "traveling_with": "with_family" },
+                "detail": "Each family member needs their own Permesso. Additional income: €8,400/yr per adult + €2,800/yr per child."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "profile 1 — US freelancer solo: most-specific non-EU freelancer condition, solo hides dependent",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "solo" },
+      "expect": {
+        "incomeWarning": false,
+        "tasks": [
+          { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["apostille"] },
+          { "id": "dependent-permesso", "present": false },
+          { "id": "passport", "present": true, "isPersonalized": false }
+        ]
+      }
+    },
+    {
+      "name": "profile 2 — US employee solo: employee-specific income requirement",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "employee", "income_range": "50k_to_100k", "traveling_with": "solo" },
+      "expect": {
+        "tasks": [
+          { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["pay stubs"] },
+          { "id": "dependent-permesso", "present": false }
+        ]
+      }
+    },
+    {
+      "name": "profile 3 — EU freelancer solo: generic freelancer condition, no apostille",
+      "profile": { "nationality": "DE", "nationality_group": "EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "solo" },
+      "expect": {
+        "tasks": [
+          { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["€28K"], "detailNotContains": ["apostille"] }
+        ]
+      }
+    },
+    {
+      "name": "profile 4 — non-EU business owner solo: business owner income requirement",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "business_owner", "income_range": "50k_to_100k", "traveling_with": "solo" },
+      "expect": {
+        "tasks": [
+          { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["Business registration"] }
+        ]
+      }
+    },
+    {
+      "name": "profile 5 — US freelancer with partner: dependent partner task appears",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_partner" },
+      "expect": {
+        "tasks": [
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["€8,400"] }
+        ]
+      }
+    },
+    {
+      "name": "profile 6 — US freelancer with family: dependent family task with child amounts",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_family" },
+      "expect": {
+        "tasks": [
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["€2,800"] }
+        ]
+      }
+    },
+    {
+      "name": "profile 7 — US mixed income solo: explicit mixed condition (no auto-merge)",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "mixed", "income_range": "50k_to_100k", "traveling_with": "solo" },
+      "expect": {
+        "tasks": [
+          { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["provide whichever applies"] }
+        ]
+      }
+    },
+    {
+      "name": "profile 8 — US freelancer under_28k: incomeWarning flag, checklist still generated",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "under_28k", "traveling_with": "solo" },
+      "expect": {
+        "incomeWarning": true,
+        "totalTasksMin": 1
+      }
+    },
+    {
+      "name": "profile 9 — BR employee solo: falls back to employee condition (no BR-specific match)",
+      "profile": { "nationality": "BR", "nationality_group": "non-EU", "residence": "United States", "income_type": "employee", "income_range": "50k_to_100k", "traveling_with": "solo" },
+      "expect": {
+        "tasks": [
+          { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["pay stubs"] }
+        ]
+      }
+    },
+    {
+      "name": "profile 10 — solo traveler: hidden_unless_matched dependent task excluded",
+      "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "solo" },
+      "expect": {
+        "tasks": [
+          { "id": "dependent-permesso", "present": false }
+        ]
+      }
+    }
+  ]
+}

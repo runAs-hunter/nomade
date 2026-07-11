@@ -1,0 +1,92 @@
+{
+  "cases": [
+    {
+      "name": "US freelancer solo — specific non-EU code",
+      "answers": {
+        "income_type": "freelancer",
+        "income_range": "50k_to_100k",
+        "nationality": "US",
+        "residence": "United States",
+        "traveling_with": "solo"
+      },
+      "expected": {
+        "nationality": "US",
+        "nationality_group": "non-EU",
+        "residence": "United States",
+        "income_type": "freelancer",
+        "income_range": "50k_to_100k",
+        "traveling_with": "solo"
+      }
+    },
+    {
+      "name": "German employee with partner — specific EU code",
+      "answers": {
+        "income_type": "employee",
+        "income_range": "28k_to_50k",
+        "nationality": "DE",
+        "residence": "Germany",
+        "traveling_with": "with_partner"
+      },
+      "expected": {
+        "nationality": "DE",
+        "nationality_group": "EU",
+        "residence": "Germany",
+        "income_type": "employee",
+        "income_range": "28k_to_50k",
+        "traveling_with": "with_partner"
+      }
+    },
+    {
+      "name": "other_eu resolves to nationality EU, group EU",
+      "answers": {
+        "income_type": "business_owner",
+        "income_range": "over_100k",
+        "nationality": "other_eu",
+        "residence": "Other EU",
+        "traveling_with": "with_family"
+      },
+      "expected": {
+        "nationality": "EU",
+        "nationality_group": "EU",
+        "residence": "Other EU",
+        "income_type": "business_owner",
+        "income_range": "over_100k",
+        "traveling_with": "with_family"
+      }
+    },
+    {
+      "name": "other_non_eu resolves to nationality OTHER, group non-EU",
+      "answers": {
+        "income_type": "mixed",
+        "income_range": "under_28k",
+        "nationality": "other_non_eu",
+        "residence": "Other",
+        "traveling_with": "solo"
+      },
+      "expected": {
+        "nationality": "OTHER",
+        "nationality_group": "non-EU",
+        "residence": "Other",
+        "income_type": "mixed",
+        "income_range": "under_28k",
+        "traveling_with": "solo"
+      }
+    },
+    {
+      "name": "missing nationality + residence fall back to non-EU / Other",
+      "answers": {
+        "income_type": "freelancer",
+        "income_range": "50k_to_100k",
+        "traveling_with": "solo"
+      },
+      "expected": {
+        "nationality": "OTHER",
+        "nationality_group": "non-EU",
+        "residence": "Other",
+        "income_type": "freelancer",
+        "income_range": "50k_to_100k",
+        "traveling_with": "solo"
+      }
+    }
+  ]
+}

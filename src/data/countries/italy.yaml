@@ -1,0 +1,129 @@
+country: Italy
+visa_name: Digital Nomad Visa (Visto per Nomadi Digitali)
+emoji: "🇮🇹"
+min_income: 28000
+duration: "Up to 1 year (renewable)"
+processing_time: "3-6 months"
+last_verified: "2026-03-22"
+sources:
+  - "https://vistoperitalia.esteri.it"
+  - "https://www.esteri.it/en/servizi-consolari-e-visti/italiani-all-estero/ingressoesoggiorno/visti/"
+  - "https://www.interno.gov.it/en"
+
+phases:
+  - name: Gather Documents
+    tasks:
+      - id: passport
+        name: Valid passport (6+ months remaining)
+        detail: Must not expire before your visa end date. Check the expiry date carefully.
+        universal: true
+
+      - id: proof-of-income
+        name: Proof of income
+        default_detail: Documents proving €28,000+/yr stable income
+        tags: [personalized]
+        conditions:
+          - if:
+              income_type: freelancer
+            detail: "Tax returns (last 2 years) + invoices + bank statements showing €28,000+/yr. All documents must be translated to Italian and apostilled if from outside the EU."
+          - if:
+              income_type: employee
+            detail: "Employment contract (stating remote work is permitted) + last 3 months of pay stubs showing equivalent of €28,000+/yr."
+          - if:
+              income_type: business_owner
+            detail: "Business registration certificate + audited financial statements + bank statements showing €28,000+/yr distributions. Company must be registered outside Italy."
+          - if:
+              income_type: mixed
+            detail: "Provide documentation for all income streams: tax returns + invoices (freelance portion) AND/OR employment contract + pay stubs (employment portion). Combined total must show €28,000+/yr."
+          - if:
+              income_type: freelancer
+              nationality_group: non-EU
+            detail: "Tax returns (last 2 years) + invoices + bank statements showing €28,000+/yr. All documents require apostille + certified Italian translation."
+          - if:
+              income_type: employee
+              nationality_group: non-EU
+            detail: "Employment contract (apostilled) + last 3 months of pay stubs (apostilled + translated) showing €28,000+/yr equivalent."
+          - if:
+              income_type: business_owner
+              nationality_group: non-EU
+            detail: "Business registration (apostilled) + financial statements (apostilled + translated) showing €28,000+/yr."
+
+      - id: health-insurance
+        name: Health insurance (Italy-valid)
+        detail: Must cover the full duration of your stay and be accepted by Italian consulates. Look for plans specifically marketed as valid for Italian visa applications.
+        cost: "€50–150/mo"
+
+      - id: accommodation
+        name: Proof of accommodation
+        detail: Rental contract or confirmed hotel/Airbnb booking covering your initial stay (minimum 1–3 months recommended).
+        time: "~1 week to arrange"
+
+      - id: criminal-record
+        name: Criminal background check
+        detail: Issued by your country of residence. Must be recent (typically within 3–6 months of application) and apostilled + translated to Italian.
+        time: "2–4 weeks to obtain"
+        tags: []
+
+      - id: cover-letter
+        name: Cover letter / motivation statement
+        detail: A letter addressed to the Italian consulate explaining your work, your clients/employer, how you work remotely, and your intention to reside in Italy. 1–2 pages.
+        tags: []
+
+      - id: financial-statements
+        name: Bank statements (last 3 months)
+        detail: Showing consistent income deposits matching your income type documentation. Must reflect the €28,000+/yr threshold.
+        universal: true
+
+  - name: Apply
+    tasks:
+      - id: consulate-appointment
+        name: Book consulate appointment
+        default_detail: Book at the Italian consulate in your country of residence. Appointments fill quickly — book 6–8 weeks in advance.
+        time: "2–8 week wait"
+        conditions:
+          - if:
+              nationality: US
+            detail: "Find your local Italian consulate at ambwashingtondc.esteri.it. Jurisdiction is based on your state of residence — check which consulate covers you."
+          - if:
+              nationality: GB
+            detail: "Apply at the Italian consulate covering your region. London, Edinburgh, and Manchester all have consulates."
+
+      - id: submit-application
+        name: Submit application + biometrics
+        detail: "Attend in-person at your consulate with a complete document package. Biometric fingerprinting is required. Bring originals + 2 copies of everything."
+        time: "Half-day appointment"
+
+      - id: visa-fee
+        name: Pay visa application fee
+        detail: "Currently €116 for the long-stay (D-type) national visa. Fee may vary slightly by consulate. Confirm current amount when booking."
+        cost: "~€116"
+
+  - name: After Arrival
+    tasks:
+      - id: permesso-soggiorno
+        name: Apply for Permesso di Soggiorno
+        detail: "Within 8 business days of arrival, go to your local Questura (police headquarters) or authorized post office (Sportello Amico). Bring passport, visa, lease/accommodation proof, photos, and the kit postal form (available at post offices)."
+        tags: [important]
+        time: "Apply within 8 days of arrival"
+
+      - id: codice-fiscale
+        name: Get your Codice Fiscale (Italian tax ID)
+        detail: "Required for signing rental contracts, opening a bank account, and accessing healthcare. Get it at the local Agenzia delle Entrate. Bring passport + visa. Usually same-day."
+        time: "Same-day at Agenzia delle Entrate"
+
+      - id: anagrafe
+        name: Register at Anagrafe (civil registry)
+        detail: "Register your residential address at your local Comune. Required for residency rights. Bring passport, visa, Permesso di Soggiorno receipt, and lease agreement."
+        time: "Within 20 days of establishing residence"
+
+      - id: dependent-permesso
+        name: Apply for dependent family Permesso di Soggiorno
+        hidden_unless_matched: true
+        tags: [personalized, important]
+        conditions:
+          - if:
+              traveling_with: with_partner
+            detail: "Your partner needs their own Permesso di Soggiorno as a family member (familiare al seguito). Additional income requirement: €8,400/yr per dependent. Your partner must have traveled to Italy on a family reunion visa — apply at the consulate before traveling."
+          - if:
+              traveling_with: with_family
+            detail: "Each family member (partner + children) needs their own Permesso di Soggiorno. Additional income requirements: €8,400/yr per dependent adult + €2,800/yr per minor child. Apply for family reunion visas at the consulate for all family members before traveling."
