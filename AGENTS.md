@@ -62,9 +62,11 @@ after completing all safe local work and report the exact blocker.
 
 ## Environment pointers
 
-- Dev Supabase: `nomade-dev` (`veuxexnzyrgznvhdjpys`, `us-west-2`) — wake/inspect before remote migration push.
-- Staging Supabase: dedicated project `nomade-staging` (create/record in F1.1; ref outside git).
-- Vercel: `nomade-dev-app`; staging = environment on this project; production human-gated.
+- Dev Supabase: `nomade-dev` (`bgdrzdlenmwbpalnjiqg`, `us-west-2`) — wake/inspect before remote migration push.
+- Prod Supabase: `nomade-prod` (`whjzynfsifrtrxlylrww`) — human-gated; do not wire secrets from agent tasks.
+- Staging Supabase: deferred (F1.1b); do not assume a staging project yet.
+- Vercel project: `nomade-app` (Hobby: Production + Preview only; custom Staging deferred). Production deploy human-gated.
+- Backend env contract: `.env.example` + `docs/backend-env.md` (F1.4).
 - Local requires current Supabase CLI + Docker Desktop or OrbStack.
 
 ## Status vocabulary

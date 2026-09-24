@@ -41,3 +41,7 @@ Confirm the live project ref in Keeper / dashboard if it differs from this runbo
 ## Git ignore
 
 `supabase/.gitignore` ignores `.temp`, `.branches`, and local dotenv keys. Root `.gitignore` already ignores `.env*`. Never commit service-role keys.
+
+## Next.js env (F1.4)
+
+Fill `.env.local` from `supabase status` (URL, anon, service_role). See [`backend-env.md`](./backend-env.md) and `.env.example`. Health: `GET /api/health`.
