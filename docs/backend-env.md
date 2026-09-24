@@ -34,7 +34,17 @@ Hobby project: **Production** + **Preview** only (no custom Staging env — defe
 | Preview | `nomade-dev` (`bgdrzdlenmwbpalnjiqg`) — non-prod service role only |
 | Production | `nomade-prod` (`whjzynfsifrtrxlylrww`) — **human gate**; do not set in F1.4 |
 
-Set the three required Supabase vars as server env (service role is **not** available to the browser). Do not put prod service role on Preview.
+Set the three required Supabase vars as server env (service role is **not** available to the browser). Do not put prod service role on Preview. Preview setup + health smoke: [`vercel-preview.md`](./vercel-preview.md).
+
+## F1.7 verification (Preview)
+
+After Preview env vars are set (human, Keeper → `nomade-dev` only):
+
+1. Open the PR Preview URL (Vercel comment / Deployments).
+2. `curl -sS "https://<preview-host>/api/health"` — expect JSON with `ok` / `supabase` only (no keys).
+3. Details, failure table, and out-of-scope notes: [`vercel-preview.md`](./vercel-preview.md).
+
+Local steps above stay the day-to-day loop; Preview is the PR smoke path.
 
 ## Client reminder
 
@@ -44,3 +54,4 @@ iOS and browser clients receive **anon/publishable** only. Service role stays on
 
 - Local DB layout: [`supabase-local.md`](./supabase-local.md)
 - Roles / RLS: [`supabase-roles-rls.md`](./supabase-roles-rls.md)
+- Vercel Preview (F1.7): [`vercel-preview.md`](./vercel-preview.md)
