@@ -9,7 +9,7 @@ Local Postgres via Supabase CLI + Docker. Migrations and seeds live in `supabase
 | `internal` | App/KB tables. **Not** in `[api].schemas` — not auto-exposed on the Data API. |
 | `api` | Explicit client/server surface (views/RPCs later). Only schema listed for PostgREST exposure. |
 
-Logical domains from `docs/architecture.md` (`identity`, `billing`, `journey`, `knowledge`, `operations`) land under `internal` (or dedicated schemas) in later migrations. **F1.3** owns roles and RLS.
+Logical domains from `docs/architecture.md` (`identity`, `billing`, `journey`, `knowledge`, `operations`) land under `internal` (or dedicated schemas) in later migrations. **Roles and RLS:** see [`supabase-roles-rls.md`](./supabase-roles-rls.md) (F1.3).
 
 ## Prerequisites
 
@@ -36,7 +36,7 @@ supabase link --project-ref bgdrzdlenmwbpalnjiqg
 
 Confirm the live project ref in Keeper / dashboard if it differs from this runbook value. Region: `us-west-2`.
 
-**Do not** `supabase db push` to remote in F1.2. First remote migration apply is a later human-gated step.
+**Do not** `supabase db push` to remote in F1.2/F1.3. First remote migration apply is a later human-gated step.
 
 ## Git ignore
 
