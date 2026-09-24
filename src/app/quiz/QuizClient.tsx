@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { clsx } from "clsx";
@@ -14,18 +14,11 @@ import { QUIZ_STEPS as STEPS, buildProfile } from "@/data/quiz";
 
 export function QuizClient() {
   const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [step, setStep] = useState(() => loadState().quizProgress?.currentStep ?? 0);
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    () => loadState().quizProgress?.answers ?? {},
+  );
   const [transitioning, setTransitioning] = useState(false);
-
-  // Restore quiz progress from localStorage
-  useEffect(() => {
-    const stored = loadState();
-    if (stored.quizProgress) {
-      setStep(stored.quizProgress.currentStep);
-      setAnswers(stored.quizProgress.answers);
-    }
-  }, []);
 
   const currentStep = STEPS[step];
   const selected = answers[currentStep.id];

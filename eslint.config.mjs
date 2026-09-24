@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent / local tooling trees committed under the repo (not app source)
+    ".claude/**",
+    ".codex/**",
+    ".gstack/**",
   ]),
 ]);
 
