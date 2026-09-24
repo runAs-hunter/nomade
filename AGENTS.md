@@ -67,6 +67,7 @@ after completing all safe local work and report the exact blocker.
 - Staging Supabase: deferred (F1.1b); do not assume a staging project yet.
 - Vercel project: `nomade-app` (Hobby: Production + Preview only; custom Staging deferred). Production deploy human-gated.
 - Backend env contract: `.env.example` + `docs/backend-env.md` (F1.4).
+- Backend CI: `docs/ci.md` (F1.5) — maps Actions check names to local commands; enable F0.5 §3.2 required checks after first green run.
 - Local requires current Supabase CLI + Docker Desktop or OrbStack.
 
 ## Status vocabulary

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { TaskItem } from "@/components/TaskItem";
@@ -16,21 +16,15 @@ interface PlanClientProps {
 }
 
 export function PlanClient({ countryData }: PlanClientProps) {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
-  const [checklist, setChecklist] = useState<PersonalizedChecklist | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  // Load state from localStorage on mount
-  useEffect(() => {
+  const [profile] = useState<UserProfile | null>(() => loadState().profile ?? null);
+  const [completedTasks, setCompletedTasks] = useState<string[]>(
+    () => loadState().completedTasks ?? [],
+  );
+  const [checklist] = useState<PersonalizedChecklist | null>(() => {
     const stored = loadState();
-    if (stored.profile) {
-      setProfile(stored.profile);
-      setCompletedTasks(stored.completedTasks);
-      const result = personalize(countryData, stored.profile);
-      setChecklist(result);
-    }
-  }, [countryData]);
+    return stored.profile ? personalize(countryData, stored.profile) : null;
+  });
+  const [copied, setCopied] = useState(false);
 
   const handleToggle = useCallback(
     (taskId: string) => {
