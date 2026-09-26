@@ -51,4 +51,4 @@ api          minimal retrieval views/functions (explicit grants only)
 
 ## Related ADRs
 
-See `docs/adrs/` for F0.1 (platform), F0.2 (data classification), F0.3 (environments).
+See `docs/adrs/` for F0.1 (platform), F0.2 (data classification), F0.3 (environments), and F2.1 (identity/session contract).
