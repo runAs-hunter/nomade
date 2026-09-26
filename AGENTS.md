@@ -77,6 +77,7 @@ after completing all safe local work and report the exact blocker.
 - Local requires current Supabase CLI + Docker Desktop or OrbStack.
 - Backup/restore + migration rollback (F1.9): [`docs/backup-restore.md`](docs/backup-restore.md), [`docs/migration-rollback.md`](docs/migration-rollback.md). Drill target is `nomade-dev` → local; prod restore is R1.6 / human-gated.
 - F2.2 Apple auth (nomade-dev only): native SIWA; see [`docs/adrs/F2.2-native-siwa-supabase-adr.md`](docs/adrs/F2.2-native-siwa-supabase-adr.md) + [`docs/runbooks/F2.2-sign-in-with-apple-runbook.md`](docs/runbooks/F2.2-sign-in-with-apple-runbook.md). No Services ID / .p8 / client-secret JWT in F2.2; prod untouched.
+- F2.3 bootstrap identity: `internal.users` / `internal.auth_identities` + `POST /api/account/bootstrap`; see [`docs/identity-bootstrap.md`](docs/identity-bootstrap.md) + [`docs/runbooks/F2.3-bootstrap-identity-runbook.md`](docs/runbooks/F2.3-bootstrap-identity-runbook.md).
 
 ## Status vocabulary
 

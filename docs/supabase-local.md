@@ -6,8 +6,8 @@ Local Postgres via Supabase CLI + Docker. Migrations and seeds live in `supabase
 
 | Schema | Role |
 |---|---|
-| `internal` | App/KB tables. **Not** in `[api].schemas` — not auto-exposed on the Data API. |
-| `api` | Explicit client/server surface (views/RPCs later). Only schema listed for PostgREST exposure. |
+| `internal` | App/KB tables (identity from F2.3). Listed in `[api].schemas` for **server** `service_role` PostgREST access only; `anon`/`authenticated` have REVOKE + RLS deny. Clients use bootstrap API — never service_role on device. |
+| `api` | Explicit client/server surface (views/RPCs later). Also listed for PostgREST exposure. |
 
 Logical domains from `docs/architecture.md` (`identity`, `billing`, `journey`, `knowledge`, `operations`) land under `internal` (or dedicated schemas) in later migrations. **Roles and RLS:** see [`supabase-roles-rls.md`](./supabase-roles-rls.md) (F1.3).
 

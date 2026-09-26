@@ -33,4 +33,25 @@ describe("jsonError", () => {
     expect(body.error.code).toBe("INTERNAL_ERROR");
     expect(body.error.requestId).toBe("req-500");
   });
+
+  it("exposes F2.3 error codes", () => {
+    expect(ERROR_CODES.UNAUTHENTICATED).toBe("UNAUTHENTICATED");
+    expect(ERROR_CODES.FORBIDDEN).toBe("FORBIDDEN");
+    expect(ERROR_CODES.ACCOUNT_PENDING_DELETION).toBe("ACCOUNT_PENDING_DELETION");
+    expect(ERROR_CODES.ACCOUNT_DELETED).toBe("ACCOUNT_DELETED");
+    expect(ERROR_CODES.MERGE_REQUIRED).toBe("MERGE_REQUIRED");
+  });
+
+  it("supports UNAUTHENTICATED 401", async () => {
+    const res = jsonError({
+      code: ERROR_CODES.UNAUTHENTICATED,
+      message: "Missing or invalid access token",
+      requestId: "req-401",
+      status: 401,
+    });
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error.code).toBe("UNAUTHENTICATED");
+  });
+
 });
