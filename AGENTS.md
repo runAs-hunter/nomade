@@ -44,6 +44,7 @@ If chat history conflicts with these files, **the files win**.
 7. **Internal KB tables** stay outside the auto-exposed Data API. Bundle explicit grants/RLS with any exposed object.
 8. **Migrations:** only one active task may add/reorder production migrations. Use the installed Supabase CLI to generate migration files. Prove `supabase db reset` locally when the task requires it.
 9. Prefer **mocked model providers in CI**. Real Anthropic calls are backend-only and entitlement-aware once built.
+10. **Structured logs** (F1.8): one JSON object per line; never log secrets, JWTs, chat/profile payloads. Error responses use `{ error: { code, message, requestId } }` + `x-request-id`. See [`docs/observability.md`](docs/observability.md).
 
 ## Standard task prompt
 
