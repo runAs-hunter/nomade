@@ -20,6 +20,7 @@ This repo owns the **Next.js backend/web**, knowledge-base implementation, and s
 | `docs/adrs/F0.2-data-classification-retention-adr.md` | Data classes, retention, AI-sharing |
 | `docs/adrs/F0.3-environment-matrix.md` | Local/dev/staging/prod matrix and promotion |
 | `docs/adrs/F2.1-identity-session-contract-adr.md` | Identity/session contract (Apple via Supabase Auth, server UUID PK, anonymous local-only, Case B merge, deletion) |
+| `docs/adrs/F2.2-native-siwa-supabase-adr.md` | Native Sign in with Apple → Supabase on nomade-dev (no Services ID / .p8 in F2.2) |
 | Revised Italian DNV KB scope | Normative knowledge-base content contract |
 
 If chat history conflicts with these files, **the files win**.
@@ -75,6 +76,7 @@ after completing all safe local work and report the exact blocker.
 - Backend CI: `docs/ci.md` (F1.5) — maps Actions check names to local commands; enable F0.5 §3.2 required checks after first green run.
 - Local requires current Supabase CLI + Docker Desktop or OrbStack.
 - Backup/restore + migration rollback (F1.9): [`docs/backup-restore.md`](docs/backup-restore.md), [`docs/migration-rollback.md`](docs/migration-rollback.md). Drill target is `nomade-dev` → local; prod restore is R1.6 / human-gated.
+- F2.2 Apple auth (nomade-dev only): native SIWA; see [`docs/adrs/F2.2-native-siwa-supabase-adr.md`](docs/adrs/F2.2-native-siwa-supabase-adr.md) + [`docs/runbooks/F2.2-sign-in-with-apple-runbook.md`](docs/runbooks/F2.2-sign-in-with-apple-runbook.md). No Services ID / .p8 / client-secret JWT in F2.2; prod untouched.
 
 ## Status vocabulary
 
