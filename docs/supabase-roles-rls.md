@@ -39,6 +39,10 @@ reset role;
 
 `internal.f1_3_smoke` is not listed in `[api].schemas`, so it is not Data-API exposed. `api.f1_3_smoke` has RLS enabled and **zero** policies for `anon`/`authenticated`.
 
+## Identity tables (F2.3)
+
+`internal.users` + `internal.auth_identities` (Class B). RLS on; no client policies; `service_role` / `postgres` only. Clients call `POST /api/account/bootstrap` — never direct Data API and never with `service_role` on device. See [`identity-bootstrap.md`](./identity-bootstrap.md) and [`runbooks/F2.3-bootstrap-identity-runbook.md`](./runbooks/F2.3-bootstrap-identity-runbook.md).
+
 ## Out of scope here
 
 Next.js adapter (F1.4), CI reset (F1.5), remote `db push`, prod link, Dashboard DDL, full domain tables.
