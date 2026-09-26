@@ -19,6 +19,7 @@ This repo owns the **Next.js backend/web**, knowledge-base implementation, and s
 | `docs/adrs/F0.1-platform-adr.md` | Approved platform vendors and env rules |
 | `docs/adrs/F0.2-data-classification-retention-adr.md` | Data classes, retention, AI-sharing |
 | `docs/adrs/F0.3-environment-matrix.md` | Local/dev/staging/prod matrix and promotion |
+| `docs/adrs/F2.1-identity-session-contract-adr.md` | Identity/session contract (Apple via Supabase Auth, server UUID PK, anonymous local-only, Case B merge, deletion) |
 | Revised Italian DNV KB scope | Normative knowledge-base content contract |
 
 If chat history conflicts with these files, **the files win**.
@@ -46,6 +47,7 @@ If chat history conflicts with these files, **the files win**.
 9. Prefer **mocked model providers in CI**. Real Anthropic calls are backend-only and entitlement-aware once built.
 10. **Structured logs** (F1.8): one JSON object per line; never log secrets, JWTs, chat/profile payloads. Error responses use `{ error: { code, message, requestId } }` + `x-request-id`. See [`docs/observability.md`](docs/observability.md).
 11. **Backup / restore (F1.9):** logical dump of `nomade-dev` → clean **local** only. Never dump/restore prod; never commit dumps; no prod restore without R1.6 + human gate. See [`docs/backup-restore.md`](docs/backup-restore.md).
+12. **Auth / session semantics (F2.1):** Follow [`docs/adrs/F2.1-identity-session-contract-adr.md`](docs/adrs/F2.1-identity-session-contract-adr.md). Implementations must not invent parallel semantics. Only one task may change auth/session contract semantics at a time; changing them requires a revised ADR.
 
 ## Standard task prompt
 
