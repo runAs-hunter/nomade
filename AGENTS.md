@@ -42,9 +42,10 @@ If chat history conflicts with these files, **the files win**.
 5. **Do not copy** static `italy.yaml` / founder-knowledge notes into approved claim records. Prototype content is an inventory to validate, not seed truth.
 6. **Secrets** never go in git. Service-role keys never go to clients.
 7. **Internal KB tables** stay outside the auto-exposed Data API. Bundle explicit grants/RLS with any exposed object.
-8. **Migrations:** only one active task may add/reorder production migrations. Use the installed Supabase CLI to generate migration files. Prove `supabase db reset` locally when the task requires it.
+8. **Migrations:** only one active task may add/reorder production migrations. Use the installed Supabase CLI to generate migration files. Prove `supabase db reset` locally when the task requires it. After merge, migrations are immutable — rollback = compensating migration (see [`docs/migration-rollback.md`](docs/migration-rollback.md)).
 9. Prefer **mocked model providers in CI**. Real Anthropic calls are backend-only and entitlement-aware once built.
 10. **Structured logs** (F1.8): one JSON object per line; never log secrets, JWTs, chat/profile payloads. Error responses use `{ error: { code, message, requestId } }` + `x-request-id`. See [`docs/observability.md`](docs/observability.md).
+11. **Backup / restore (F1.9):** logical dump of `nomade-dev` → clean **local** only. Never dump/restore prod; never commit dumps; no prod restore without R1.6 + human gate. See [`docs/backup-restore.md`](docs/backup-restore.md).
 
 ## Standard task prompt
 
@@ -71,6 +72,7 @@ after completing all safe local work and report the exact blocker.
 - Backend env contract: `.env.example` + `docs/backend-env.md` (F1.4).
 - Backend CI: `docs/ci.md` (F1.5) — maps Actions check names to local commands; enable F0.5 §3.2 required checks after first green run.
 - Local requires current Supabase CLI + Docker Desktop or OrbStack.
+- Backup/restore + migration rollback (F1.9): [`docs/backup-restore.md`](docs/backup-restore.md), [`docs/migration-rollback.md`](docs/migration-rollback.md). Drill target is `nomade-dev` → local; prod restore is R1.6 / human-gated.
 
 ## Status vocabulary
 
