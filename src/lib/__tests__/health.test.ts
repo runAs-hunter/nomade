@@ -21,6 +21,10 @@ const VALID = {
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU",
 };
 
+function healthRequest(headers?: Record<string, string>): Request {
+  return new Request("http://localhost/api/health", { headers });
+}
+
 describe("GET /api/health", () => {
   const prev = { ...process.env };
 
@@ -46,7 +50,7 @@ describe("GET /api/health", () => {
 
   it("returns ok + up when ping succeeds (no Anthropic required)", async () => {
     selectLimit.mockResolvedValue({ data: [{ id: 1 }], error: null });
-    const res = await GET();
+    const res = await GET(healthRequest());
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
@@ -56,8 +60,16 @@ describe("GET /api/health", () => {
     });
     expect(JSON.stringify(body)).not.toMatch(/eyJ/);
     expect(JSON.stringify(body)).not.toMatch(/service_role/);
+    expect(res.headers.get("x-request-id")).toBeTruthy();
     expect(schemaMock).toHaveBeenCalledWith("api");
     expect(fromMock).toHaveBeenCalledWith("f1_3_smoke");
+  });
+
+  it("echoes safe incoming x-request-id", async () => {
+    selectLimit.mockResolvedValue({ data: [{ id: 1 }], error: null });
+    const id = "client-trace-abc-123";
+    const res = await GET(healthRequest({ "x-request-id": id }));
+    expect(res.headers.get("x-request-id")).toBe(id);
   });
 
   it("returns down + code when ping fails", async () => {
@@ -65,7 +77,7 @@ describe("GET /api/health", () => {
       data: null,
       error: { message: "secret-should-not-leak eyJhbGciOi" },
     });
-    const res = await GET();
+    const res = await GET(healthRequest());
     expect(res.status).toBe(503);
     const body = await res.json();
     expect(body.ok).toBe(false);
@@ -73,11 +85,12 @@ describe("GET /api/health", () => {
     expect(body.code).toBe("SUPABASE_PING_FAILED");
     expect(JSON.stringify(body)).not.toMatch(/eyJ/);
     expect(JSON.stringify(body)).not.toContain("secret-should-not-leak");
+    expect(res.headers.get("x-request-id")).toBeTruthy();
   });
 
   it("returns ENV_INVALID when required env missing", async () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const res = await GET();
+    const res = await GET(healthRequest());
     expect(res.status).toBe(503);
     const body = await res.json();
     expect(body).toMatchObject({
@@ -86,5 +99,6 @@ describe("GET /api/health", () => {
       code: "ENV_INVALID",
     });
     expect(JSON.stringify(body)).not.toMatch(/eyJ/);
+    expect(res.headers.get("x-request-id")).toBeTruthy();
   });
 });

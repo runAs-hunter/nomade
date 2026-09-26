@@ -52,6 +52,7 @@ iOS and browser clients receive **anon/publishable** only. Service role stays on
 
 ## Related
 
+- Observability (F1.8): [`observability.md`](./observability.md)
 - Local DB layout: [`supabase-local.md`](./supabase-local.md)
 - Roles / RLS: [`supabase-roles-rls.md`](./supabase-roles-rls.md)
 - Vercel Preview (F1.7): [`vercel-preview.md`](./vercel-preview.md)
