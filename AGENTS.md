@@ -78,6 +78,7 @@ after completing all safe local work and report the exact blocker.
 - Backup/restore + migration rollback (F1.9): [`docs/backup-restore.md`](docs/backup-restore.md), [`docs/migration-rollback.md`](docs/migration-rollback.md). Drill target is `nomade-dev` → local; prod restore is R1.6 / human-gated.
 - F2.2 Apple auth (nomade-dev only): native SIWA; see [`docs/adrs/F2.2-native-siwa-supabase-adr.md`](docs/adrs/F2.2-native-siwa-supabase-adr.md) + [`docs/runbooks/F2.2-sign-in-with-apple-runbook.md`](docs/runbooks/F2.2-sign-in-with-apple-runbook.md). No Services ID / .p8 / client-secret JWT in F2.2; prod untouched.
 - F2.3 bootstrap identity: `internal.users` / `internal.auth_identities` + `POST /api/account/bootstrap`; see [`docs/identity-bootstrap.md`](docs/identity-bootstrap.md) + [`docs/runbooks/F2.3-bootstrap-identity-runbook.md`](docs/runbooks/F2.3-bootstrap-identity-runbook.md).
+- F2.5 JWT middleware polish: shared `requireAccess` + `GET /api/account/me`; chat/route/health stay public; see [`docs/auth-api.md`](docs/auth-api.md) + [`docs/runbooks/F2.5-jwt-middleware-polish-runbook.md`](docs/runbooks/F2.5-jwt-middleware-polish-runbook.md).
 
 ## Status vocabulary
 

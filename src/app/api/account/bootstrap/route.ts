@@ -5,10 +5,10 @@ import {
   type MergeCase,
 } from "@/lib/account/bootstrap";
 import { ERROR_CODES, jsonError } from "@/lib/api-error";
+import { requireAccess } from "@/lib/auth/require-access";
 import {
   resolveAppleProviderSubject,
   subjectPrefix,
-  verifyAccessToken,
 } from "@/lib/auth/verify-access-token";
 import { log } from "@/lib/log";
 import { getRequestId, REQUEST_ID_HEADER } from "@/lib/request-id";
@@ -44,7 +44,7 @@ function withRequestId<T>(
 }
 
 /**
- * POST /api/account/bootstrap (F2.3 / F2.1 §5 / §10)
+ * POST /api/account/bootstrap (F2.3 / F2.1 §5 / §10; F2.5 uses requireAccess)
  * Bearer JWT → idempotent ensure internal.users + Apple auth_identities.
  */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -79,24 +79,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   }
 
-  // --- verify JWT (env-scoped via current project keys) ---
-  const verified = await verifyAccessToken(
-    request.headers.get("authorization"),
-  );
-  if (!verified.ok) {
-    logger.info("bootstrap unauthenticated", {
-      code: ERROR_CODES.UNAUTHENTICATED,
-      reason: verified.reason,
-    });
-    return jsonError({
-      code: ERROR_CODES.UNAUTHENTICATED,
-      message: "Missing or invalid access token",
-      requestId,
-      status: 401,
-    });
-  }
+  // --- verify JWT via shared helper (env-scoped getUser) ---
+  const auth = await requireAccess(request, {
+    requestId,
+    logger,
+    failMessage: "bootstrap unauthenticated",
+  });
+  if (auth instanceof NextResponse) return auth;
 
-  const { user, userId } = verified.value;
+  const { user, userId } = auth;
   const providerSubject = resolveAppleProviderSubject(user);
   if (!providerSubject) {
     // Prefer UNAUTHENTICATED when no usable Apple binding (F2.3 runbook).
