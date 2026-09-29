@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   isValidDeleteConfirm,
+  readAppleAuthorizationCode,
   softDeleteAccount,
 } from "@/lib/account/delete";
 import { ERROR_CODES, jsonError } from "@/lib/api-error";
@@ -23,10 +24,11 @@ function withRequestId<T>(
 }
 
 /**
- * POST /api/account/delete (F2.6)
+ * POST /api/account/delete (F2.6 + F2.6r)
  * Bearer via requireAccess + body {"confirm":"DELETE"}.
+ * Optional appleAuthorizationCode (native SIWA): revoke at Apple before soft-delete.
  * Soft-delete → pending_deletion; closes active auth_identities.
- * Idempotent 200 when already pending. No Auth deleteUser / purge / Apple revoke.
+ * Idempotent 200 when already pending (skips Apple revoke). No Auth deleteUser / purge.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const requestId = getRequestId(request);
@@ -69,11 +71,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   }
 
-  // 3–5. Soft-delete transition (idempotent)
+  const appleCode = readAppleAuthorizationCode(parsed);
+  if (!appleCode.ok) {
+    logger.info("delete bad apple code", {
+      code: ERROR_CODES.BAD_REQUEST,
+      userId: auth.userId,
+    });
+    return jsonError({
+      code: ERROR_CODES.BAD_REQUEST,
+      message: "appleAuthorizationCode must be a string",
+      requestId,
+      status: 400,
+    });
+  }
+
+  // 3–5. Apple revoke (when code present) then soft-delete (idempotent)
   let result;
   try {
     const service = createServiceClient();
-    result = await softDeleteAccount(service, auth.userId);
+    result = await softDeleteAccount(service, auth.userId, {
+      appleAuthorizationCode: appleCode.code,
+    });
   } catch {
     logger.error("delete threw", {
       code: ERROR_CODES.INTERNAL_ERROR,
@@ -112,6 +130,25 @@ export async function POST(request: Request): Promise<NextResponse> {
         status: 410,
       });
     }
+    if (
+      result.code === "APPLE_REVOKE_FAILED" ||
+      result.code === "APPLE_REVOKE_MISCONFIGURED"
+    ) {
+      const status = result.code === "APPLE_REVOKE_MISCONFIGURED" ? 503 : 502;
+      logger.warn("apple revoke failed", {
+        code: result.code,
+        userId: auth.userId,
+      });
+      return jsonError({
+        code: result.code,
+        message:
+          result.code === "APPLE_REVOKE_MISCONFIGURED"
+            ? "Apple token revoke is not configured"
+            : "Apple token revoke failed",
+        requestId,
+        status,
+      });
+    }
     logger.error("delete failed", {
       code: ERROR_CODES.INTERNAL_ERROR,
       userId: auth.userId,
@@ -129,6 +166,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     userId: result.value.userId,
     deletionStatus: result.value.deletionStatus,
     alreadyPending: result.alreadyPending,
+    appleRevoked: result.value.appleRevoked,
+    appleRevokeSkipped: !result.value.appleRevoked,
   });
   return withRequestId(result.value, 200, requestId);
 }

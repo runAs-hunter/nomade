@@ -143,6 +143,7 @@ describe("softDeleteAccount", () => {
       userId: USER_ID,
       deletionStatus: "pending_deletion",
       deletedAt: NOW,
+      appleRevoked: false,
     });
     expect(state.users[0].deletion_status).toBe("pending_deletion");
     expect(state.users[0].deleted_at).toBe(NOW);
@@ -175,6 +176,169 @@ describe("softDeleteAccount", () => {
     if (!res.ok) return;
     expect(res.alreadyPending).toBe(true);
     expect(res.value.deletedAt).toBe(prior);
+    expect(state.users[0].deleted_at).toBe(prior);
+  });
+});
+
+describe("readAppleAuthorizationCode", () => {
+  it("returns the trimmed code when present", async () => {
+    const { readAppleAuthorizationCode } = await import("@/lib/account/delete");
+    expect(
+      readAppleAuthorizationCode({
+        confirm: "DELETE",
+        appleAuthorizationCode: "  code-test  ",
+      }),
+    ).toEqual({ ok: true, code: "code-test" });
+  });
+
+  it("treats missing, null, and blank as no code", async () => {
+    const { readAppleAuthorizationCode } = await import("@/lib/account/delete");
+    expect(readAppleAuthorizationCode({ confirm: "DELETE" })).toEqual({ ok: true });
+    expect(
+      readAppleAuthorizationCode({ confirm: "DELETE", appleAuthorizationCode: null }),
+    ).toEqual({ ok: true });
+    expect(
+      readAppleAuthorizationCode({ confirm: "DELETE", appleAuthorizationCode: "  " }),
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects non-strings and oversized values", async () => {
+    const { readAppleAuthorizationCode, APPLE_AUTHORIZATION_CODE_MAX } = await import(
+      "@/lib/account/delete"
+    );
+    expect(
+      readAppleAuthorizationCode({ appleAuthorizationCode: 1 }),
+    ).toEqual({ ok: false });
+    expect(
+      readAppleAuthorizationCode({
+        appleAuthorizationCode: "x".repeat(APPLE_AUTHORIZATION_CODE_MAX + 1),
+      }),
+    ).toEqual({ ok: false });
+  });
+});
+
+describe("softDeleteAccount Apple revoke", () => {
+  it("revokes before flipping status when a code is present", async () => {
+    const state = {
+      users: [
+        { id: USER_ID, deletion_status: "active", deleted_at: null },
+      ],
+      identities: [
+        { id: "id-1", user_id: USER_ID, closed_at: null },
+      ],
+    };
+    const order: string[] = [];
+    const service = makeDeleteService(state);
+    const res = await softDeleteAccount(service, USER_ID, {
+      nowIso: NOW,
+      appleAuthorizationCode: "auth-code-test",
+      revokeAuthorizationCode: async () => {
+        order.push("revoke");
+        expect(state.users[0].deletion_status).toBe("active");
+      },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.appleRevoked).toBe(true);
+    expect(order).toEqual(["revoke"]);
+    expect(state.users[0].deletion_status).toBe("pending_deletion");
+    expect(state.identities[0].closed_at).toBe(NOW);
+  });
+
+  it("does not change status when revoke fails", async () => {
+    const { AppleRevokeError } = await import("@/lib/apple/revoke");
+    const state = {
+      users: [
+        { id: USER_ID, deletion_status: "active", deleted_at: null },
+      ],
+      identities: [
+        { id: "id-1", user_id: USER_ID, closed_at: null },
+      ],
+    };
+    const service = makeDeleteService(state);
+    const res = await softDeleteAccount(service, USER_ID, {
+      nowIso: NOW,
+      appleAuthorizationCode: "auth-code-test",
+      revokeAuthorizationCode: async () => {
+        throw new AppleRevokeError("APPLE_REVOKE_FAILED", "Apple token revoke failed");
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.code).toBe("APPLE_REVOKE_FAILED");
+    expect(state.users[0].deletion_status).toBe("active");
+    expect(state.identities[0].closed_at).toBeNull();
+  });
+
+  it("maps misconfigured revoke to APPLE_REVOKE_MISCONFIGURED without status change", async () => {
+    const { AppleRevokeError } = await import("@/lib/apple/revoke");
+    const state = {
+      users: [{ id: USER_ID, deletion_status: "active", deleted_at: null }],
+      identities: [],
+    };
+    const service = makeDeleteService(state);
+    const res = await softDeleteAccount(service, USER_ID, {
+      nowIso: NOW,
+      appleAuthorizationCode: "auth-code-test",
+      revokeAuthorizationCode: async () => {
+        throw new AppleRevokeError(
+          "APPLE_REVOKE_MISCONFIGURED",
+          "Apple SIWA revoke config is missing",
+        );
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.code).toBe("APPLE_REVOKE_MISCONFIGURED");
+    expect(state.users[0].deletion_status).toBe("active");
+  });
+
+  it("soft-deletes with appleRevoked false when no code", async () => {
+    const state = {
+      users: [{ id: USER_ID, deletion_status: "active", deleted_at: null }],
+      identities: [],
+    };
+    let called = false;
+    const service = makeDeleteService(state);
+    const res = await softDeleteAccount(service, USER_ID, {
+      nowIso: NOW,
+      revokeAuthorizationCode: async () => {
+        called = true;
+      },
+    });
+    expect(called).toBe(false);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.appleRevoked).toBe(false);
+    expect(state.users[0].deletion_status).toBe("pending_deletion");
+  });
+
+  it("skips revoke when already pending even if a code is sent", async () => {
+    const prior = "2026-09-28T12:00:00.000Z";
+    const state = {
+      users: [
+        {
+          id: USER_ID,
+          deletion_status: "pending_deletion",
+          deleted_at: prior,
+        },
+      ],
+      identities: [],
+    };
+    let called = false;
+    const service = makeDeleteService(state);
+    const res = await softDeleteAccount(service, USER_ID, {
+      nowIso: NOW,
+      appleAuthorizationCode: "auth-code-test",
+      revokeAuthorizationCode: async () => {
+        called = true;
+      },
+    });
+    expect(called).toBe(false);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.alreadyPending).toBe(true);
+    expect(res.value.appleRevoked).toBe(false);
     expect(state.users[0].deleted_at).toBe(prior);
   });
 });

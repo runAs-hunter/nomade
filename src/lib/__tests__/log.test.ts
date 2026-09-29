@@ -30,6 +30,21 @@ describe("redact", () => {
     expect(JSON.stringify(out)).not.toMatch(/eyJ/);
   });
 
+  it("redacts Apple authorization codes and client secrets", () => {
+    const out = redact({
+      appleAuthorizationCode: "auth-code-test",
+      authorizationCode: "auth-code-test",
+      client_secret: "header.payload.sig",
+      apple_private_key: "pem",
+      appleRevoked: false,
+    }) as Record<string, unknown>;
+    expect(out.appleAuthorizationCode).toBe("[REDACTED]");
+    expect(out.authorizationCode).toBe("[REDACTED]");
+    expect(out.client_secret).toBe("[REDACTED]");
+    expect(out.apple_private_key).toBe("[REDACTED]");
+    expect(out.appleRevoked).toBe(false);
+  });
+
   it("redacts messages and content log fields", () => {
     const out = redact({
       messages: [{ role: "user", content: "secret chat" }],
