@@ -24,7 +24,15 @@ App-owned user bootstrap after Apple sign-in via Supabase Auth. Full runbook: [`
 
 Until journey tables exist, `hasServerJourney` is always `false` (TODO F4). Case B / `MERGE_REQUIRED` cannot fire yet.
 
+## Shared auth (F2.5)
+
+Protected account routes use `requireAccess` (`src/lib/auth/require-access.ts`) wrapping env-scoped `verifyAccessToken`. See [`auth-api.md`](./auth-api.md) for the route classification table and how to protect a new route.
+
+`GET /api/account/me` — Bearer required; returns `{ userId, deletionStatus, emailPresent }` (no full email). Missing `internal.users` row → `401 UNAUTHENTICATED` “Bootstrap required”.
+
 ## Related
 
+- Auth API / route classification: [`auth-api.md`](./auth-api.md)
+- F2.5 runbook: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md)
 - Roles/RLS foundation: [`supabase-roles-rls.md`](./supabase-roles-rls.md)
 - Local layout: [`supabase-local.md`](./supabase-local.md)
