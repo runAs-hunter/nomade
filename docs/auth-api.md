@@ -1,6 +1,6 @@
-# Auth API (F2.5 / F2.6)
+# Auth API (F2.5 / F2.6 / F2.6p)
 
-Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
+Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
 
 ## Verify primitive
 
@@ -20,6 +20,7 @@ Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.
 | `GET /api/account/me` | Protected | Bearer via `requireAccess` |
 | `POST /api/account/export` | Protected | Bearer via `requireAccess` |
 | `POST /api/account/delete` | Protected | Bearer via `requireAccess` + `{ "confirm": "DELETE" }` |
+| `GET\|POST /api/cron/purge-accounts` | Internal / cron (F2.6p) | `Authorization: Bearer ${CRON_SECRET}` only — **not** `requireAccess` |
 | Future journey sync | Protected | Bearer + user-scoped authz (`assertSameUser`) |
 
 ## Protect a new route
@@ -67,4 +68,17 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - **`deleted`:** `410 ACCOUNT_DELETED`.
 - **No user row:** `401 UNAUTHENTICATED` “Bootstrap required”.
 - **Not in this route:** Auth `deleteUser`, purge cron, Apple `/auth/revoke` (see F2.6p / App Review follow-ups).
-- **Subscriptions:** deleting the app account does **not** cancel App Store subscriptions (disclose in iOS UI when built). Hard wipe SLA: within **30 days** (F0.2) via later purge job.
+- **Subscriptions:** deleting the app account does **not** cancel App Store subscriptions (disclose in iOS UI when built). Hard wipe SLA: within **30 days** (F0.2); operational purge after **24h** grace via F2.6p cron.
+
+## `GET|POST /api/cron/purge-accounts` (F2.6p)
+
+- **Auth:** `Authorization: Bearer ${CRON_SECRET}` only (Vercel Cron / manual curl). **Not** `requireAccess` / user Bearer.
+- **Body:** ignored (GET and POST both OK).
+- **Success 200:** `{ ok, requestId, scanned, purged, skippedAlreadyDeleted, skippedLegalHold, authAlreadyGone, failed }` — **counts only** (no PII / email / `sub` / tokens).
+- **Unauthorized:** `401 UNAUTHENTICATED`. Missing `CRON_SECRET` env → `500 ENV_INVALID`.
+- **Partial failures:** still **200** with `failed > 0`; batch continues.
+- **Eligibility:** `deletion_status = pending_deletion` AND `deleted_at <= now() - 24h`; batch ≤ 50 per run.
+- **Per user:** legal-hold stub (always false) → scrub `email → null` → DELETE `auth_identities` → journey/chat/billing wipe stubs → `auth.admin.deleteUser` (Auth-missing = success) → `deletion_status = deleted` (keep row; leave `deleted_at`).
+- Soft delete does **not** Auth-delete; only this cron does. Apple `/auth/revoke` still deferred. Chat / route / health stay public.
+- Schedule: `vercel.json` cron `0 4 * * *` UTC → `/api/cron/purge-accounts`. Preview may not fire like Production — local/manual curl with Keeper secret is the smoke path.
+- Full runbook: [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md).

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 
 /**
@@ -20,6 +21,11 @@ export const serverEnvSchema = z
     SUPABASE_PROJECT_REF: z.string().trim().min(1).optional(),
     /** Optional at boot so /api/health works without Anthropic. */
     ANTHROPIC_API_KEY: z.string().trim().min(1).optional(),
+    /**
+     * Optional at boot so /api/health works without cron config.
+     * Required inside cron routes via getCronSecret() (F2.6p).
+     */
+    CRON_SECRET: z.string().trim().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (looksLikeServiceRoleJwt(data.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
@@ -83,6 +89,7 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     SUPABASE_SERVICE_ROLE_KEY: source.SUPABASE_SERVICE_ROLE_KEY,
     SUPABASE_PROJECT_REF: source.SUPABASE_PROJECT_REF || undefined,
     ANTHROPIC_API_KEY: source.ANTHROPIC_API_KEY || undefined,
+    CRON_SECRET: source.CRON_SECRET || undefined,
   });
 
   if (!result.success) {
@@ -116,3 +123,37 @@ export function projectRefFromUrl(url: string): string | undefined {
     return undefined;
   }
 }
+
+/**
+ * CRON_SECRET for cron routes (F2.6p).
+ * Optional in parseServerEnv; required here so /api/health still boots without it.
+ * Never log the returned value.
+ */
+export function getCronSecret(source: EnvSource = process.env): string {
+  const raw = source.CRON_SECRET;
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!value) {
+    throw new Error(
+      "Invalid server environment: CRON_SECRET: required for cron routes",
+    );
+  }
+  return value;
+}
+
+/**
+ * Constant-time Bearer match for cron Authorization header.
+ * Never logs the header or secret. Returns false on missing/wrong shape.
+ */
+export function cronAuthorizationMatches(
+  authorization: string | null,
+  secret: string,
+): boolean {
+  if (!authorization || !authorization.startsWith("Bearer ")) return false;
+  const token = authorization.slice("Bearer ".length);
+  if (!token || !secret) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(secret);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+

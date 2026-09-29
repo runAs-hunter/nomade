@@ -24,6 +24,7 @@ Set these on Vercel → `nomade-app` → Settings → Environment Variables, sco
 | `SUPABASE_SERVICE_ROLE_KEY` | Preview (**server only**) | `nomade-dev` service role — never `NEXT_PUBLIC_*`, never iOS |
 | `SUPABASE_PROJECT_REF` | Preview (optional) | `bgdrzdlenmwbpalnjiqg` |
 | `ANTHROPIC_API_KEY` | Preview (optional) | Health must not require it |
+| `CRON_SECRET` | Preview (optional at boot; required for purge cron) | F2.6p; from Keeper. Preview may not fire Vercel Cron like Production — smoke with manual curl + Bearer secret |
 
 Typed validation: `src/lib/env.ts`. Full local contract: [`backend-env.md`](./backend-env.md).
 
@@ -71,6 +72,10 @@ F1.7 is still Done when Preview deploys and returns structured health JSON (even
 - Remote `db push` / migration apply to `nomade-dev`
 - GitHub Actions deploy tokens (Vercel Git integration owns Preview)
 - Anthropic chat routes, iOS, branch-protection changes
+
+## Cron (F2.6p)
+
+`vercel.json` schedules `GET /api/cron/purge-accounts` daily at `0 4 * * *` UTC. Hobby Preview may not deliver crons the same way as Production — use manual curl with `Authorization: Bearer ${CRON_SECRET}` (Keeper) against Preview/local for smoke. Do **not** enable against `nomade-prod` from this task.
 
 ## Related
 
