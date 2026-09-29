@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
+  cronAuthorizationMatches,
   formatEnvError,
+  getCronSecret,
   looksLikeServiceRoleJwt,
   parseServerEnv,
   projectRefFromUrl,
@@ -145,5 +147,34 @@ describe("formatEnvError", () => {
     const msg = formatEnvError(bad.error);
     expect(msg).toContain("NEXT_PUBLIC_SUPABASE_URL");
     expect(msg).not.toMatch(/eyJ/);
+  });
+});
+
+describe("CRON_SECRET optional / getCronSecret", () => {
+  it("allows missing CRON_SECRET in parseServerEnv", () => {
+    const env = parseServerEnv(VALID);
+    expect(env.CRON_SECRET).toBeUndefined();
+  });
+
+  it("parses optional CRON_SECRET", () => {
+    const env = parseServerEnv({ ...VALID, CRON_SECRET: " cron-test " });
+    expect(env.CRON_SECRET).toBe("cron-test");
+  });
+
+  it("getCronSecret throws when missing", () => {
+    expect(() => getCronSecret({})).toThrow(/CRON_SECRET/);
+  });
+
+  it("getCronSecret returns trimmed value", () => {
+    expect(getCronSecret({ CRON_SECRET: " abc " })).toBe("abc");
+  });
+
+  it("cronAuthorizationMatches accepts exact Bearer", () => {
+    expect(cronAuthorizationMatches("Bearer secret123", "secret123")).toBe(
+      true,
+    );
+    expect(cronAuthorizationMatches("Bearer wrong", "secret123")).toBe(false);
+    expect(cronAuthorizationMatches(null, "secret123")).toBe(false);
+    expect(cronAuthorizationMatches("Basic x", "secret123")).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ Typed validation lives in `src/lib/env.ts`. Supabase server clients: `src/lib/su
 | `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | Yes | Server / Vercel **server** env only. Never `NEXT_PUBLIC_*`, never iOS |
 | `SUPABASE_PROJECT_REF` | No | Optional | e.g. `bgdrzdlenmwbpalnjiqg` for diagnostics |
 | `ANTHROPIC_API_KEY` | Yes | Optional at boot | Required only when chat/model routes run; health must work without it |
+| `CRON_SECRET` | **Yes** | Optional at boot; **required** inside cron routes | F2.6p `GET\|POST /api/cron/purge-accounts`. Value from Keeper; never commit. Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}` |
 
 Copy `.env.example` → `.env.local`. Keeper remains source of truth for secret values.
 

@@ -30,26 +30,30 @@ Protected account routes use `requireAccess` (`src/lib/auth/require-access.ts`) 
 
 `GET /api/account/me` — Bearer required; returns `{ userId, deletionStatus, emailPresent }` (no full email). Missing `internal.users` row → `401 UNAUTHENTICATED` “Bootstrap required”.
 
-## Deletion status (F2.6)
+## Deletion status (F2.6 / F2.6p)
 
-Status machine (soft delete now; hard purge later):
+Status machine:
 
 ```text
 active
-  └─ POST /api/account/delete (confirm) ──► pending_deletion  (set deleted_at; close auth_identities)
-        └─ (later purge job F2.6p) ──► deleted
+  └─ POST /api/account/delete (confirm) ──► pending_deletion  (F2.6: set deleted_at; close auth_identities)
+        └─ cron purge (deleted_at <= now()-24h) ──► deleted
+              (F2.6p: scrub Class B PII; wipe domain stubs; Auth admin deleteUser;
+               keep users row; deletion_status=deleted; leave deleted_at)
 ```
 
 - **Bootstrap** rejects `pending_deletion` (`403 ACCOUNT_PENDING_DELETION`) and `deleted` (`410 ACCOUNT_DELETED`).
 - **Export** (`POST /api/account/export`) remains allowed while `pending_deletion`; rejected when `deleted`.
-- **Delete** is idempotent while `pending_deletion`. No cancel/restore in V1.
-- Soft delete does **not** call Auth `deleteUser` or Apple revoke — those belong to F2.6p / App Review prep.
-- Full contracts: [`auth-api.md`](./auth-api.md) + [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md).
+- **Delete** is idempotent while `pending_deletion`. No cancel/restore in V1 (24h grace is operational only).
+- Soft delete does **not** call Auth `deleteUser` or Apple revoke.
+- **Hard purge** (`GET|POST /api/cron/purge-accounts`, Bearer `CRON_SECRET`): after 24h grace, scrubs `email`, deletes `auth_identities`, calls Auth `admin.deleteUser`, sets `deletion_status = deleted`. Re-signup after Auth delete mints a **new** UUID + fresh bootstrap.
+- Full contracts: [`auth-api.md`](./auth-api.md) + [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md) + [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md).
 
 ## Related
 
 - Auth API / route classification: [`auth-api.md`](./auth-api.md)
 - F2.5 runbook: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md)
 - F2.6 runbook: [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md)
+- F2.6p runbook: [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md)
 - Roles/RLS foundation: [`supabase-roles-rls.md`](./supabase-roles-rls.md)
 - Local layout: [`supabase-local.md`](./supabase-local.md)
