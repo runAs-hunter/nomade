@@ -2,8 +2,10 @@ import { describe, it, expect, afterEach } from "vitest";
 import {
   cronAuthorizationMatches,
   formatEnvError,
+  getAppleSiwaConfig,
   getCronSecret,
   looksLikeServiceRoleJwt,
+  normalizeApplePrivateKey,
   parseServerEnv,
   projectRefFromUrl,
   resetServerEnvCache,
@@ -176,5 +178,62 @@ describe("CRON_SECRET optional / getCronSecret", () => {
     expect(cronAuthorizationMatches("Bearer wrong", "secret123")).toBe(false);
     expect(cronAuthorizationMatches(null, "secret123")).toBe(false);
     expect(cronAuthorizationMatches("Basic x", "secret123")).toBe(false);
+  });
+});
+
+describe("Apple SIWA env optional / getAppleSiwaConfig", () => {
+  it("allows missing Apple vars in parseServerEnv", () => {
+    const env = parseServerEnv(VALID);
+    expect(env.APPLE_TEAM_ID).toBeUndefined();
+    expect(env.APPLE_KEY_ID).toBeUndefined();
+    expect(env.APPLE_PRIVATE_KEY).toBeUndefined();
+    expect(env.APPLE_CLIENT_ID).toBeUndefined();
+  });
+
+  it("parses optional Apple vars without echoing them in errors", () => {
+    const env = parseServerEnv({
+      ...VALID,
+      APPLE_TEAM_ID: " TEAMIDTEST ",
+      APPLE_KEY_ID: "KEYIDTEST1",
+      APPLE_PRIVATE_KEY: "pem-sentinel-not-a-real-key",
+      APPLE_CLIENT_ID: "com.izaya.Nomade",
+    });
+    expect(env.APPLE_TEAM_ID).toBe("TEAMIDTEST");
+    expect(env.APPLE_CLIENT_ID).toBe("com.izaya.Nomade");
+  });
+
+  it("getAppleSiwaConfig throws naming vars but not the private key", () => {
+    try {
+      getAppleSiwaConfig({
+        APPLE_PRIVATE_KEY: "pem-sentinel-not-a-real-key",
+      });
+      expect.unreachable();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      expect(msg).toMatch(/APPLE_TEAM_ID/);
+      expect(msg).toMatch(/APPLE_PRIVATE_KEY/);
+      expect(msg).not.toContain("pem-sentinel-not-a-real-key");
+    }
+  });
+
+  it("getAppleSiwaConfig returns trimmed ids and normalized PEM", () => {
+    const cfg = getAppleSiwaConfig({
+      APPLE_TEAM_ID: " TEAMIDTEST ",
+      APPLE_KEY_ID: "KEYIDTEST1",
+      APPLE_PRIVATE_KEY: '"-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----"',
+      APPLE_CLIENT_ID: "com.izaya.Nomade",
+    });
+    expect(cfg.teamId).toBe("TEAMIDTEST");
+    expect(cfg.keyId).toBe("KEYIDTEST1");
+    expect(cfg.clientId).toBe("com.izaya.Nomade");
+    expect(cfg.privateKey).toBe(
+      "-----BEGIN PRIVATE KEY-----\nABC\n-----END PRIVATE KEY-----",
+    );
+    expect(cfg.privateKey).not.toContain("\\n");
+  });
+
+  it("normalizeApplePrivateKey leaves real newlines alone", () => {
+    const pem = "-----BEGIN PRIVATE KEY-----\nABC\n-----END PRIVATE KEY-----";
+    expect(normalizeApplePrivateKey(pem)).toBe(pem);
   });
 });

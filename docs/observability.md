@@ -15,7 +15,7 @@ Structured logging, request IDs, and stable API error envelopes for Nomade backe
 
 ### Redaction denylist (case-insensitive field names)
 
-`password`, `secret`, `token`, `authorization`, `cookie`, `set-cookie`, `api_key`, `apikey`, `access_token`, `refresh_token`, `service_role`, `anon_key`, `private_key`, `credit_card`, `ssn`, `authorization_header`, plus `messages` / `content` when used as log fields.
+`password`, `secret`, `token`, `authorization`, `cookie`, `set-cookie`, `api_key`, `apikey`, `access_token`, `refresh_token`, `service_role`, `anon_key`, `private_key`, `credit_card`, `ssn`, `authorization_header`, `appleAuthorizationCode`, `authorizationCode`, `authorization_code`, `client_secret`, `clientSecret`, `apple_private_key`, plus `messages` / `content` when used as log fields.
 
 Also:
 

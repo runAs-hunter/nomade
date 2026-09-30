@@ -26,6 +26,16 @@ export const serverEnvSchema = z
      * Required inside cron routes via getCronSecret() (F2.6p).
      */
     CRON_SECRET: z.string().trim().min(1).optional(),
+    /**
+     * F2.6r Apple SIWA revoke. Optional at boot (health still works).
+     * Required together inside getAppleSiwaConfig() when revoking.
+     * APPLE_CLIENT_ID is the App ID (com.izaya.Nomade) — not a Services ID.
+     * APPLE_PRIVATE_KEY is the .p8 PEM (Keeper → Preview/local only).
+     */
+    APPLE_TEAM_ID: z.string().trim().min(1).optional(),
+    APPLE_KEY_ID: z.string().trim().min(1).optional(),
+    APPLE_PRIVATE_KEY: z.string().trim().min(1).optional(),
+    APPLE_CLIENT_ID: z.string().trim().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (looksLikeServiceRoleJwt(data.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
@@ -90,6 +100,10 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     SUPABASE_PROJECT_REF: source.SUPABASE_PROJECT_REF || undefined,
     ANTHROPIC_API_KEY: source.ANTHROPIC_API_KEY || undefined,
     CRON_SECRET: source.CRON_SECRET || undefined,
+    APPLE_TEAM_ID: source.APPLE_TEAM_ID || undefined,
+    APPLE_KEY_ID: source.APPLE_KEY_ID || undefined,
+    APPLE_PRIVATE_KEY: source.APPLE_PRIVATE_KEY || undefined,
+    APPLE_CLIENT_ID: source.APPLE_CLIENT_ID || undefined,
   });
 
   if (!result.success) {
@@ -122,6 +136,59 @@ export function projectRefFromUrl(url: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+export type AppleSiwaConfig = {
+  teamId: string;
+  keyId: string;
+  /** PKCS#8 PEM. Never log. */
+  privateKey: string;
+  /** App ID / bundle ID. Not a Services ID. */
+  clientId: string;
+};
+
+function optionalTrimmed(value: string | undefined): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Vercel often stores multiline PEMs as a single line with literal \\n.
+ * Strips one pair of surrounding quotes. Never log the result.
+ */
+export function normalizeApplePrivateKey(raw: string): string {
+  let value = raw.trim();
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1);
+  }
+  return value.includes("\\n") ? value.replace(/\\n/g, "\n") : value;
+}
+
+/**
+ * Apple SIWA Key config for token revoke (F2.6r).
+ * Optional in parseServerEnv; required here so /api/health still boots without it.
+ * Never log the returned private key.
+ */
+export function getAppleSiwaConfig(source: EnvSource = process.env): AppleSiwaConfig {
+  const teamId = optionalTrimmed(source.APPLE_TEAM_ID);
+  const keyId = optionalTrimmed(source.APPLE_KEY_ID);
+  const privateKeyRaw = optionalTrimmed(source.APPLE_PRIVATE_KEY);
+  const clientId = optionalTrimmed(source.APPLE_CLIENT_ID);
+  if (!teamId || !keyId || !privateKeyRaw || !clientId) {
+    throw new Error(
+      "Invalid server environment: APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, APPLE_CLIENT_ID: required for Apple token revoke",
+    );
+  }
+  return {
+    teamId,
+    keyId,
+    privateKey: normalizeApplePrivateKey(privateKeyRaw),
+    clientId,
+  };
 }
 
 /**

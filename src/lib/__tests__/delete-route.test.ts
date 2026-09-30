@@ -145,6 +145,7 @@ describe("POST /api/account/delete", () => {
         userId: USER_ID,
         deletionStatus: "pending_deletion",
         deletedAt: "2026-09-29T17:30:00.000Z",
+        appleRevoked: false,
       },
     });
     const res = await POST(deleteRequest());
@@ -154,11 +155,13 @@ describe("POST /api/account/delete", () => {
       userId: USER_ID,
       deletionStatus: "pending_deletion",
       deletedAt: "2026-09-29T17:30:00.000Z",
+      appleRevoked: false,
     });
     expect(res.headers.get("x-request-id")).toBeTruthy();
     expect(softDeleteAccount).toHaveBeenCalledWith(
       expect.anything(),
       USER_ID,
+      { appleAuthorizationCode: undefined },
     );
   });
 
@@ -171,6 +174,7 @@ describe("POST /api/account/delete", () => {
         userId: USER_ID,
         deletionStatus: "pending_deletion",
         deletedAt: "2026-09-28T12:00:00.000Z",
+        appleRevoked: false,
       },
     });
     const res = await POST(deleteRequest());
@@ -191,5 +195,98 @@ describe("POST /api/account/delete", () => {
     expect(res.status).toBe(410);
     const body = await res.json();
     expect(body.error.code).toBe(ERROR_CODES.ACCOUNT_DELETED);
+  });
+
+  it("forwards appleAuthorizationCode and returns appleRevoked", async () => {
+    okAuth();
+    softDeleteAccount.mockResolvedValue({
+      ok: true,
+      alreadyPending: false,
+      value: {
+        userId: USER_ID,
+        deletionStatus: "pending_deletion",
+        deletedAt: "2026-09-29T17:30:00.000Z",
+        appleRevoked: true,
+      },
+    });
+    const res = await POST(
+      deleteRequest({
+        body: { confirm: "DELETE", appleAuthorizationCode: " code-test " },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.appleRevoked).toBe(true);
+    expect(softDeleteAccount).toHaveBeenCalledWith(expect.anything(), USER_ID, {
+      appleAuthorizationCode: "code-test",
+    });
+  });
+
+  it("returns 400 when appleAuthorizationCode is not a string", async () => {
+    okAuth();
+    const res = await POST(
+      deleteRequest({ body: { confirm: "DELETE", appleAuthorizationCode: 12 } }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe(ERROR_CODES.BAD_REQUEST);
+    expect(softDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 APPLE_REVOKE_FAILED and does not claim success", async () => {
+    okAuth();
+    softDeleteAccount.mockResolvedValue({
+      ok: false,
+      code: "APPLE_REVOKE_FAILED",
+      message: "Apple token revoke failed",
+    });
+    const res = await POST(
+      deleteRequest({
+        body: { confirm: "DELETE", appleAuthorizationCode: "code-test" },
+      }),
+    );
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error.code).toBe(ERROR_CODES.APPLE_REVOKE_FAILED);
+    expect(JSON.stringify(body)).not.toContain("code-test");
+  });
+
+  it("returns 503 APPLE_REVOKE_MISCONFIGURED", async () => {
+    okAuth();
+    softDeleteAccount.mockResolvedValue({
+      ok: false,
+      code: "APPLE_REVOKE_MISCONFIGURED",
+      message: "Apple token revoke failed",
+    });
+    const res = await POST(
+      deleteRequest({
+        body: { confirm: "DELETE", appleAuthorizationCode: "code-test" },
+      }),
+    );
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error.code).toBe(ERROR_CODES.APPLE_REVOKE_MISCONFIGURED);
+  });
+
+  it("idempotent pending response includes appleRevoked false", async () => {
+    okAuth();
+    softDeleteAccount.mockResolvedValue({
+      ok: true,
+      alreadyPending: true,
+      value: {
+        userId: USER_ID,
+        deletionStatus: "pending_deletion",
+        deletedAt: "2026-09-28T12:00:00.000Z",
+        appleRevoked: false,
+      },
+    });
+    const res = await POST(
+      deleteRequest({
+        body: { confirm: "DELETE", appleAuthorizationCode: "code-test" },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.appleRevoked).toBe(false);
   });
 });

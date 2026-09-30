@@ -34,6 +34,13 @@ export const REDACT_FIELD_DENYLIST = [
   "credit_card",
   "ssn",
   "authorization_header",
+  // F2.6r — Apple revoke material. Outcome codes only in logs.
+  "appleauthorizationcode",
+  "authorizationcode",
+  "authorization_code",
+  "client_secret",
+  "clientsecret",
+  "apple_private_key",
   // Chat / profile payload keys — callers must not pass them; strip if they do.
   "messages",
   "content",
