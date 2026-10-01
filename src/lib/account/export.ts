@@ -1,6 +1,7 @@
 /**
- * F2.6 account export — build user-scoped JSON envelope.
- * See docs/runbooks/F2.6-account-deletion-export-runbook.md.
+ * F2.6 / F3 account export — build user-scoped JSON envelope.
+ * See docs/runbooks/F2.6-account-deletion-export-runbook.md;
+ * F3 fills `journey` (docs/runbooks/F3-journey-checklist-runbook.md).
  *
  * providerSubject may appear in the export file (user-owned). Never log it.
  */
@@ -22,13 +23,28 @@ export type ExportIdentity = {
   closedAt: string | null;
 };
 
+export type ExportJourneyStep = {
+  stepId: string;
+  status: string;
+  updatedAt: string;
+};
+
+export type ExportJourneyCase = {
+  caseId: string;
+  pathId: string;
+  countryCode: string;
+  createdAt: string;
+  updatedAt: string;
+  steps: ExportJourneyStep[];
+};
+
 export type AccountExportEnvelope = {
   exportedAt: string;
   userId: string;
   deletionStatus: DeletionStatus;
   account: ExportAccount;
   identities: ExportIdentity[];
-  journey: [];
+  journey: ExportJourneyCase[];
   chat: [];
   billing: [];
   notes: string[];
@@ -63,7 +79,7 @@ export type BuildExportResult =
     };
 
 const EXPORT_NOTES = [
-  "journey/chat/billing arrays empty until those domains ship; format stable for clients",
+  "journey array filled when a case exists (F3); chat/billing empty until those domains ship",
 ];
 
 /**
@@ -73,9 +89,11 @@ const EXPORT_NOTES = [
 export function buildExportEnvelope(args: {
   user: ExportUserRow;
   identities: ExportIdentityRow[];
+  journey?: ExportJourneyCase[];
   exportedAt?: string;
 }): AccountExportEnvelope {
   const { user, identities } = args;
+  const journey = args.journey ?? [];
   const email =
     typeof user.email === "string" && user.email.trim().length > 0
       ? user.email.trim()
@@ -101,11 +119,87 @@ export function buildExportEnvelope(args: {
       createdAt: row.created_at,
       closedAt: row.closed_at,
     })),
-    journey: [],
+    journey,
     chat: [],
     billing: [],
     notes: [...EXPORT_NOTES],
   };
+}
+
+
+type JourneyCaseExportRow = {
+  id: string;
+  path_id: string;
+  country_code: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type JourneyStepExportRow = {
+  case_id: string;
+  step_id: string;
+  status: string;
+  updated_at: string;
+};
+
+/** Load journey cases + step states for export (user-scoped). */
+export async function loadJourneyForExport(
+  service: AccountDbClient,
+  userId: string,
+): Promise<
+  | { ok: true; journey: ExportJourneyCase[] }
+  | { ok: false; code: "DB_ERROR"; message: string }
+> {
+  const db = service.schema("internal");
+
+  const caseRes = await db
+    .from("journey_cases")
+    .select("id, path_id, country_code, created_at, updated_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (caseRes.error) {
+    return { ok: false, code: "DB_ERROR", message: "Failed to read journey cases" };
+  }
+
+  const cases = (caseRes.data as JourneyCaseExportRow[] | null) ?? [];
+  if (cases.length === 0) {
+    return { ok: true, journey: [] };
+  }
+
+  const caseIds = cases.map((c) => c.id);
+  const stepRes = await db
+    .from("journey_step_states")
+    .select("case_id, step_id, status, updated_at")
+    .in("case_id", caseIds)
+    .order("step_id", { ascending: true });
+
+  if (stepRes.error) {
+    return { ok: false, code: "DB_ERROR", message: "Failed to read journey steps" };
+  }
+
+  const steps = (stepRes.data as JourneyStepExportRow[] | null) ?? [];
+  const byCase = new Map<string, ExportJourneyStep[]>();
+  for (const s of steps) {
+    const list = byCase.get(s.case_id) ?? [];
+    list.push({
+      stepId: s.step_id,
+      status: s.status,
+      updatedAt: s.updated_at,
+    });
+    byCase.set(s.case_id, list);
+  }
+
+  const journey: ExportJourneyCase[] = cases.map((c) => ({
+    caseId: c.id,
+    pathId: c.path_id,
+    countryCode: c.country_code,
+    createdAt: c.created_at,
+    updatedAt: c.updated_at,
+    steps: byCase.get(c.id) ?? [],
+  }));
+
+  return { ok: true, journey };
 }
 
 /**
@@ -154,8 +248,18 @@ export async function loadAccountExport(
 
   const identities = (idRes.data as ExportIdentityRow[] | null) ?? [];
 
+  const journeyRes = await loadJourneyForExport(service, userId);
+  if (!journeyRes.ok) {
+    return { ok: false, code: "DB_ERROR", message: journeyRes.message };
+  }
+
   return {
     ok: true,
-    envelope: buildExportEnvelope({ user, identities, exportedAt }),
+    envelope: buildExportEnvelope({
+      user,
+      identities,
+      journey: journeyRes.journey,
+      exportedAt,
+    }),
   };
 }
