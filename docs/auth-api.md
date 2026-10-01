@@ -1,6 +1,6 @@
-# Auth API (F2.5 / F2.6 / F2.6p / F2.6r)
+# Auth API (F2.5 / F2.6 / F2.6p / F2.6r / F3)
 
-Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md), [`runbooks/F2.6r-apple-token-revoke-runbook.md`](./runbooks/F2.6r-apple-token-revoke-runbook.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
+Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md), [`runbooks/F2.6r-apple-token-revoke-runbook.md`](./runbooks/F2.6r-apple-token-revoke-runbook.md), [`runbooks/F3-journey-checklist-runbook.md`](./runbooks/F3-journey-checklist-runbook.md). Journey overview: [`journey.md`](./journey.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
 
 ## Verify primitive
 
@@ -21,7 +21,10 @@ Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.
 | `POST /api/account/export` | Protected | Bearer via `requireAccess` |
 | `POST /api/account/delete` | Protected | Bearer via `requireAccess` + `{ "confirm": "DELETE" }` (+ optional `appleAuthorizationCode`) |
 | `GET\|POST /api/cron/purge-accounts` | Internal / cron (F2.6p) | `Authorization: Bearer ${CRON_SECRET}` only — **not** `requireAccess` |
-| Future journey sync | Protected | Bearer + user-scoped authz (`assertSameUser`) |
+| `GET /api/journey/paths` | Protected (F3) | Bearer via `requireAccess` + active account |
+| `GET\|POST /api/journey/case` | Protected (F3) | Bearer via `requireAccess` + active account |
+| `GET /api/journey/checklist` | Protected (F3) | Bearer via `requireAccess` + active account |
+| `PATCH /api/journey/steps/{stepId}` | Protected (F3) | Bearer via `requireAccess` + active account |
 
 ## Protect a new route
 
@@ -54,7 +57,7 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - **Body:** empty / ignored.
 - **Success 200:** sync JSON envelope — `{ exportedAt, userId, deletionStatus, account, identities, journey, chat, billing, notes }`.
   - `account.email` included only when present on `internal.users`; `identities[].providerSubject` included in the file (**never log** it).
-  - `journey` / `chat` / `billing` are empty arrays until those domains ship.
+  - `journey` filled when a case exists (F3); `chat` / `billing` empty until those domains ship.
 - **`pending_deletion`:** still **200** (final copy allowed).
 - **`deleted`:** `410 ACCOUNT_DELETED`.
 - **No user row:** `401 UNAUTHENTICATED` “Bootstrap required”.
@@ -79,7 +82,37 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - **Unauthorized:** `401 UNAUTHENTICATED`. Missing `CRON_SECRET` env → `500 ENV_INVALID`.
 - **Partial failures:** still **200** with `failed > 0`; batch continues.
 - **Eligibility:** `deletion_status = pending_deletion` AND `deleted_at <= now() - 24h`; batch ≤ 50 per run.
-- **Per user:** legal-hold stub (always false) → scrub `email → null` → DELETE `auth_identities` → journey/chat/billing wipe stubs → `auth.admin.deleteUser` (Auth-missing = success) → `deletion_status = deleted` (keep row; leave `deleted_at`).
+- **Per user:** legal-hold stub (always false) → scrub `email → null` → DELETE `auth_identities` → **F3** `wipeJourney` (delete `journey_cases`, steps cascade) + chat/billing wipe stubs → `auth.admin.deleteUser` (Auth-missing = success) → `deletion_status = deleted` (keep row; leave `deleted_at`).
 - Soft delete does **not** Auth-delete; only this cron does. Apple `/auth/revoke` is **not** called here (F2.6r revokes on soft-delete only). Chat / route / health stay public.
 - Schedule: `vercel.json` cron `0 4 * * *` UTC → `/api/cron/purge-accounts`. Preview may not fire like Production — local/manual curl with Keeper secret is the smoke path.
 - Full runbook: [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md).
+
+
+## Journey routes (F3)
+
+All require Bearer `requireAccess` and **active** `internal.users` (`pending_deletion` → `403 ACCOUNT_PENDING_DELETION`; `deleted` → `410 ACCOUNT_DELETED`; no row → `401` Bootstrap required). Service client only — no client-direct grants.
+
+### `GET /api/journey/paths`
+
+- **200:** `{ paths: [{ pathId, title, description, available }], requestId }`
+
+### `GET /api/journey/case`
+
+- **200:** `{ case: { caseId, pathId, countryCode, createdAt, updatedAt } | null, requestId }`
+
+### `POST /api/journey/case`
+
+- **Body:** `{ "pathId": "italy_digital_nomad" }`
+- **200:** `{ case, created, pathChanged, requestId }` — same path returns existing; path change resets steps
+- **400:** unknown / unavailable path
+
+### `GET /api/journey/checklist`
+
+- **200:** `{ caseId, pathId, catalogVersion, phases, progress, disclaimer, requestId }`
+- **404 `NO_JOURNEY_CASE`:** no case yet (client shows path select)
+
+### `PATCH /api/journey/steps/{stepId}`
+
+- **Body:** `{ "status": "not_started" | "in_progress" | "done" }`
+- **200:** `{ stepId, status, updatedAt, progress, requestId }`
+- **400:** bad status; **404:** unknown step / no case

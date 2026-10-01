@@ -3,7 +3,8 @@
  * See docs/runbooks/F2.6p-account-hard-purge-runbook.md.
  *
  * Auth admin deleteUser lives here only (never soft-delete). No Apple revoke.
- * Journey/chat/billing wipe stubs are no-ops until those tables exist.
+ * F3: wipeJourney deletes journey_cases (step_states cascade).
+ * Chat/billing wipe stubs remain no-ops until those tables exist.
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
@@ -72,10 +73,27 @@ export function isUnderLegalHold(userId: string): boolean {
   return false;
 }
 
-/** Journey wipe stub — no-op until F4 tables exist. */
-export async function wipeJourney(userId: string): Promise<WipeResult> {
-  void userId;
-  return { wiped: 0 };
+/**
+ * F3 journey wipe — DELETE internal.journey_cases for user (step_states cascade).
+ * Returns wiped case row count. Chat/billing remain stubs.
+ */
+export async function wipeJourney(
+  service: AccountDbClient,
+  userId: string,
+): Promise<WipeResult> {
+  const db = service.schema("internal");
+  const res = await db
+    .from("journey_cases")
+    .delete()
+    .eq("user_id", userId)
+    .select("id");
+
+  if (res.error) {
+    // Best-effort: do not abort purge on wipe failure.
+    return { wiped: 0 };
+  }
+  const rows = (res.data as { id: string }[] | null) ?? [];
+  return { wiped: rows.length };
 }
 
 /** Chat wipe stub — no-op until user-bound chat tables exist. */
@@ -220,8 +238,8 @@ export async function purgeAccount(
     return { userId, outcome: "failed", failCode: "DELETE_IDENTITIES" };
   }
 
-  // 3. Domain wipe stubs (no-ops today)
-  await wipeJourney(userId);
+  // 3. Domain wipes — journey real (F3); chat/billing stubs
+  await wipeJourney(service, userId);
   await wipeChat(userId);
   await wipeBilling(userId);
 

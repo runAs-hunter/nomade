@@ -59,7 +59,7 @@ describe("buildExportEnvelope", () => {
       chat: [],
       billing: [],
       notes: [
-        "journey/chat/billing arrays empty until those domains ship; format stable for clients",
+        "journey array filled when a case exists (F3); chat/billing empty until those domains ship",
       ],
     });
   });
@@ -89,35 +89,55 @@ type FakeRow = Record<string, unknown>;
 function makeExportService(state: {
   users: FakeRow[];
   identities: FakeRow[];
+  journeyCases?: FakeRow[];
+  journeySteps?: FakeRow[];
 }) {
+  const journeyCases = state.journeyCases ?? [];
+  const journeySteps = state.journeySteps ?? [];
   return {
     schema: (name: string) => {
       expect(name).toBe("internal");
       return {
         from: (table: string) => {
           const filters: { col: string; val: unknown; op: string }[] = [];
+          let inFilter: { col: string; vals: unknown[] } | null = null;
           const api: Record<string, unknown> = {};
           const self = api;
+          const tableRows = (): FakeRow[] => {
+            if (table === "users") return state.users;
+            if (table === "auth_identities") return state.identities;
+            if (table === "journey_cases") return journeyCases;
+            if (table === "journey_step_states") return journeySteps;
+            return [];
+          };
           api.select = () => self;
           api.eq = (col: string, val: unknown) => {
             filters.push({ col, val, op: "eq" });
             return self;
           };
+          api.in = (col: string, vals: unknown[]) => {
+            inFilter = { col, vals };
+            return self;
+          };
           api.order = () => self;
           api.maybeSingle = async () => {
-            const rows = table === "users" ? state.users : state.identities;
+            const rows = tableRows();
             const match = rows.find((r) =>
               filters.every((f) => r[f.col] === f.val),
             );
             return { data: match ?? null, error: null };
           };
-          // For identities select without maybeSingle — return thenable array
           api.then = (
             resolve: (v: { data: FakeRow[] | null; error: null }) => unknown,
           ) => {
-            const rows = state.identities.filter((r) =>
+            let rows = tableRows().filter((r) =>
               filters.every((f) => r[f.col] === f.val),
             );
+            if (inFilter) {
+              rows = rows.filter((r) =>
+                inFilter!.vals.includes(r[inFilter!.col]),
+              );
+            }
             return Promise.resolve(
               resolve({ data: rows, error: null }),
             );
@@ -205,5 +225,61 @@ describe("loadAccountExport", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.envelope.deletionStatus).toBe("pending_deletion");
+  });
+
+  it("includes journey case + steps when present (F3)", async () => {
+    const caseId = "cccccccc-dddd-eeee-ffff-000000000001";
+    const service = makeExportService({
+      users: [activeUser()],
+      identities: [],
+      journeyCases: [
+        {
+          id: caseId,
+          user_id: USER_ID,
+          path_id: "italy_digital_nomad",
+          country_code: "IT",
+          created_at: "2026-09-10T00:00:00.000Z",
+          updated_at: "2026-09-11T00:00:00.000Z",
+        },
+      ],
+      journeySteps: [
+        {
+          case_id: caseId,
+          step_id: "passport",
+          status: "done",
+          updated_at: "2026-09-11T00:00:00.000Z",
+        },
+        {
+          case_id: caseId,
+          step_id: "visa-fee",
+          status: "in_progress",
+          updated_at: "2026-09-11T12:00:00.000Z",
+        },
+      ],
+    });
+    const res = await loadAccountExport(service, USER_ID, EXPORTED_AT);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.envelope.journey).toEqual([
+      {
+        caseId,
+        pathId: "italy_digital_nomad",
+        countryCode: "IT",
+        createdAt: "2026-09-10T00:00:00.000Z",
+        updatedAt: "2026-09-11T00:00:00.000Z",
+        steps: [
+          {
+            stepId: "passport",
+            status: "done",
+            updatedAt: "2026-09-11T00:00:00.000Z",
+          },
+          {
+            stepId: "visa-fee",
+            status: "in_progress",
+            updatedAt: "2026-09-11T12:00:00.000Z",
+          },
+        ],
+      },
+    ]);
   });
 });

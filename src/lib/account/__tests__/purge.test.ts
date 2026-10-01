@@ -25,8 +25,10 @@ type FakeRow = Record<string, unknown>;
 function makePurgeService(state: {
   users: FakeRow[];
   identities: FakeRow[];
+  journeyCases?: FakeRow[];
   deleteUser?: ReturnType<typeof vi.fn>;
 }) {
+  if (!state.journeyCases) state.journeyCases = [];
   const deleteUser =
     state.deleteUser ??
     vi.fn(async () => ({ data: { user: null }, error: null }));
@@ -90,7 +92,7 @@ function makePurgeService(state: {
             return self;
           };
           api.maybeSingle = async () => {
-            const rows = table === "users" ? state.users : state.identities;
+            const rows = table === "users" ? state.users : table === "auth_identities" ? state.identities : (state.journeyCases ?? []);
             const match = rows.find((r) => matches(r));
             return { data: match ?? null, error: null };
           };
@@ -106,7 +108,7 @@ function makePurgeService(state: {
           api.then = (
             resolve: (v: { data: unknown; error: null }) => unknown,
           ) => {
-            const rows = table === "users" ? state.users : state.identities;
+            const rows = table === "users" ? state.users : table === "auth_identities" ? state.identities : (state.journeyCases ?? []);
             if (pendingUpdate) {
               for (const r of rows) {
                 if (matches(r)) Object.assign(r, pendingUpdate);
@@ -116,18 +118,25 @@ function makePurgeService(state: {
             }
             if (pendingDelete) {
               const keep: FakeRow[] = [];
+              const removed: FakeRow[] = [];
               for (const r of rows) {
-                if (!matches(r)) keep.push(r);
+                if (matches(r)) removed.push(r);
+                else keep.push(r);
               }
               if (table === "users") {
                 state.users.length = 0;
                 state.users.push(...keep);
-              } else {
+              } else if (table === "auth_identities") {
                 state.identities.length = 0;
                 state.identities.push(...keep);
+              } else if (table === "journey_cases") {
+                const jc = state.journeyCases ?? [];
+                jc.length = 0;
+                jc.push(...keep);
+                state.journeyCases = jc;
               }
               pendingDelete = false;
-              return Promise.resolve(resolve({ data: null, error: null }));
+              return Promise.resolve(resolve({ data: removed, error: null }));
             }
             // select list
             let matched = rows.filter((r) => matches(r));
@@ -162,8 +171,18 @@ describe("purge constants / stubs", () => {
     expect(isUnderLegalHold(USER_ID)).toBe(false);
   });
 
-  it("domain wipe stubs return wiped:0", async () => {
-    expect(await wipeJourney(USER_ID)).toEqual({ wiped: 0 });
+  it("chat/billing wipe stubs return wiped:0; journey wipe deletes cases", async () => {
+    const state = {
+      users: [],
+      identities: [],
+      journeyCases: [
+        { id: "case-1", user_id: USER_ID, path_id: "italy_digital_nomad" },
+        { id: "case-2", user_id: OTHER_ID, path_id: "italy_digital_nomad" },
+      ],
+    };
+    const service = makePurgeService(state);
+    expect(await wipeJourney(service, USER_ID)).toEqual({ wiped: 1 });
+    expect(state.journeyCases.map((c) => c.id)).toEqual(["case-2"]);
     expect(await wipeChat(USER_ID)).toEqual({ wiped: 0 });
     expect(await wipeBilling(USER_ID)).toEqual({ wiped: 0 });
   });
