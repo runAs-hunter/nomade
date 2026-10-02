@@ -38,6 +38,7 @@ export type ProcessTransactionResult =
         | "PRODUCT_MISMATCH"
         | "BUNDLE_MISMATCH"
         | "MISCONFIGURED"
+        | "CONFLICT"
         | "DB_ERROR";
       message: string;
     };
@@ -140,7 +141,7 @@ export async function processAppStoreTransaction(
   });
 
   if (!recorded.ok) {
-    return { ok: false, code: "DB_ERROR", message: recorded.message };
+    return { ok: false, code: recorded.code, message: recorded.message };
   }
 
   return {

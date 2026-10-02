@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { processAppStoreTransaction } from "@/lib/billing/transactions";
 import { verifiedTransactionFixture } from "@/lib/billing/verify-jws";
-import { JOURNEY_FULL_ENTITLEMENT_ID } from "@/lib/billing/catalog";
+import {
+  BILLING_SOURCE_APP_STORE,
+  JOURNEY_FULL_ENTITLEMENT_ID,
+} from "@/lib/billing/catalog";
 
 const USER_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const OTHER_USER_ID = "11111111-2222-3333-4444-555555555555";
 const PRODUCT = "asc.sandbox.from.keeper";
 const NOW = "2026-10-02T14:00:00.000Z";
 
@@ -182,5 +186,55 @@ describe("processAppStoreTransaction", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("PRODUCT_MISMATCH");
+  });
+
+  it("txn already owned by another user", async () => {
+    const state = {
+      events: [
+        {
+          id: "ev-owned",
+          user_id: OTHER_USER_ID,
+          source: BILLING_SOURCE_APP_STORE,
+          product_id: PRODUCT,
+          transaction_id: "txn-owned",
+          original_transaction_id: "txn-owned",
+          event_type: "purchase",
+          occurred_at: NOW,
+          raw_ref: "hash",
+          created_at: NOW,
+        },
+      ] as FakeRow[],
+      entitlements: [
+        {
+          user_id: OTHER_USER_ID,
+          entitlement_id: JOURNEY_FULL_ENTITLEMENT_ID,
+          status: "active",
+          source_transaction_id: "txn-owned",
+          granted_at: NOW,
+          updated_at: NOW,
+        },
+      ] as FakeRow[],
+    };
+    const service = makeBillingService(state);
+    const result = await processAppStoreTransaction(service, {
+      userId: USER_ID,
+      body: { signedTransaction: "header.payload.sig", eventType: "restore" },
+      config: { journeyProductId: PRODUCT, bundleId: "com.izaya.Nomade" },
+      verify: async () => ({
+        ok: true as const,
+        transaction: verifiedTransactionFixture({
+          productId: PRODUCT,
+          transactionId: "txn-owned",
+        }),
+      }),
+      nowIso: NOW,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("CONFLICT");
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0].user_id).toBe(OTHER_USER_ID);
+    expect(
+      state.entitlements.filter((e) => e.user_id === USER_ID),
+    ).toHaveLength(0);
   });
 });

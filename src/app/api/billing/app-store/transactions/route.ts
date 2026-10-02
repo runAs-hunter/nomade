@@ -107,6 +107,18 @@ export async function POST(request: Request): Promise<NextResponse> {
           status: 503,
         });
       }
+      if (result.code === "CONFLICT") {
+        logger.info("billing transaction ownership conflict", {
+          code: ERROR_CODES.CONFLICT,
+          userId: auth.userId,
+        });
+        return jsonError({
+          code: ERROR_CODES.CONFLICT,
+          message: result.message,
+          requestId,
+          status: 409,
+        });
+      }
       logger.error("billing transaction failed", {
         code: ERROR_CODES.INTERNAL_ERROR,
         userId: auth.userId,

@@ -115,11 +115,16 @@ export type RecordVerifiedTransactionResult =
       entitlement: EntitlementView;
       eventInserted: boolean;
     }
-  | { ok: false; code: "DB_ERROR"; message: string };
+  | {
+      ok: false;
+      code: "DB_ERROR" | "CONFLICT";
+      message: string;
+    };
 
 /**
  * Idempotent upsert: billing_events unique (source, transaction_id);
  * entitlement granted/updated for the mapped entitlement id.
+ * Same-user replay is idempotent; cross-user reuse → CONFLICT.
  */
 export async function recordVerifiedTransaction(
   service: AccountDbClient,
@@ -142,7 +147,9 @@ export async function recordVerifiedTransaction(
   }
 
   let eventInserted = false;
-  if (!existing.data) {
+  let existingRow = (existing.data as BillingEventRow | null) ?? null;
+
+  if (!existingRow) {
     const ins = await db.from("billing_events").insert({
       user_id: args.userId,
       source: BILLING_SOURCE_APP_STORE,
@@ -154,7 +161,7 @@ export async function recordVerifiedTransaction(
       raw_ref: args.rawRef,
     });
     if (ins.error) {
-      // Race: unique violation → treat as already present
+      // Race: unique violation → re-read and bind to existing owner
       const msg = String(
         (ins.error as { message?: string; code?: string }).message ?? "",
       );
@@ -168,9 +175,34 @@ export async function recordVerifiedTransaction(
           message: "Failed to insert billing event",
         };
       }
+      const again = await db
+        .from("billing_events")
+        .select(
+          "id, user_id, source, product_id, transaction_id, original_transaction_id, event_type, occurred_at, raw_ref, created_at",
+        )
+        .eq("source", BILLING_SOURCE_APP_STORE)
+        .eq("transaction_id", args.transactionId)
+        .maybeSingle();
+      if (again.error || !again.data) {
+        return {
+          ok: false,
+          code: "DB_ERROR",
+          message: "Failed to read billing event after conflict",
+        };
+      }
+      existingRow = again.data as BillingEventRow;
     } else {
       eventInserted = true;
     }
+  }
+
+  // Cap F3: bind transaction_id to claiming user — never grant to a different caller
+  if (existingRow && existingRow.user_id !== args.userId) {
+    return {
+      ok: false,
+      code: "CONFLICT",
+      message: "Transaction already recorded for another user",
+    };
   }
 
   const upsert = await db
