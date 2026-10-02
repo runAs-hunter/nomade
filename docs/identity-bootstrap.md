@@ -22,7 +22,7 @@ App-owned user bootstrap after Apple sign-in via Supabase Auth. Full runbook: [`
 - Success 200: `{ userId, created, merge: { case, hasLocalDraft, hasServerJourney } }`
 - Errors: F1.8 envelope — `UNAUTHENTICATED`, `ACCOUNT_PENDING_DELETION`, `ACCOUNT_DELETED`, `MERGE_REQUIRED` (Case B; stubbed until F4 journey), `BAD_REQUEST`, `INTERNAL_ERROR`
 
-Until journey tables exist, `hasServerJourney` is always `false` (TODO F4). Case B / `MERGE_REQUIRED` cannot fire yet.
+F4: `hasServerJourney` is `true` when `internal.journey_cases` has a row for the user. Case B / `MERGE_REQUIRED` fires when `hasLocalDraft && hasServerJourney`.
 
 ## Shared auth (F2.5)
 

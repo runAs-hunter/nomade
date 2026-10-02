@@ -1,5 +1,6 @@
 /**
- * F3 checklist join — catalog + step statuses + progress.
+ * F3/F4 checklist join — catalog + step statuses + progress.
+ * F4: each step exposes updatedAt for client echo / expectedUpdatedAt.
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
@@ -25,6 +26,8 @@ export type ChecklistStepView = {
   name: string;
   detail: string;
   status: JourneyStepStatus;
+  /** ISO timestamptz — echo as expectedUpdatedAt on PATCH. Missing rows use case.updatedAt or epoch. */
+  updatedAt: string;
 };
 
 export type ChecklistPhaseView = {
@@ -82,15 +85,20 @@ export function buildChecklistView(args: {
   pathId: JourneyPathId;
   states: StepStateRow[];
 }): ChecklistView {
-  const statusById = new Map(args.states.map((s) => [s.step_id, s.status]));
+  const stateById = new Map(args.states.map((s) => [s.step_id, s]));
+  const fallbackUpdatedAt = args.journeyCase.updatedAt;
   const phases = getPhasesForPath(args.pathId).map((phase) => ({
     name: phase.name,
-    steps: phase.steps.map((step) => ({
-      id: step.id,
-      name: step.name,
-      detail: step.detail,
-      status: statusById.get(step.id) ?? ("not_started" as JourneyStepStatus),
-    })),
+    steps: phase.steps.map((step) => {
+      const row = stateById.get(step.id);
+      return {
+        id: step.id,
+        name: step.name,
+        detail: step.detail,
+        status: row?.status ?? ("not_started" as JourneyStepStatus),
+        updatedAt: row?.updated_at ?? fallbackUpdatedAt,
+      };
+    }),
   }));
 
   const statuses = phases.flatMap((p) => p.steps.map((s) => s.status));

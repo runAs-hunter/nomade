@@ -171,6 +171,7 @@ describe("buildChecklistView", () => {
     expect(view.progress.total).toBe(13);
     const passport = view.phases[0].steps.find((s) => s.id === "passport");
     expect(passport?.status).toBe("done");
+    expect(passport?.updatedAt).toBe(NOW);
     expect(view.phases.flatMap((p) => p.steps).some((s) => s.id === "dependent-permesso")).toBe(
       false,
     );
