@@ -16,9 +16,8 @@ export type ComputeMergeCaseInput = {
  *
  * Priority: D (identity already linked) → B (both drafts) → A (local only) → C.
  *
- * TODO(F4): wire hasServerJourney from exists(journey… where user_id = …).
- * Until journey tables exist, callers MUST pass hasServerJourney=false so Case B
- * cannot fire yet. MERGE_REQUIRED only when hasLocalDraft && hasServerJourney.
+ * F4: callers pass hasServerJourney from userHasJourneyCase (exists journey_cases).
+ * MERGE_REQUIRED only when hasLocalDraft && hasServerJourney (Case B).
  */
 export function computeMergeCase(input: ComputeMergeCaseInput): MergeCase {
   const { hasLocalDraft, hasServerJourney, identityAlreadyLinked } = input;

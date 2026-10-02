@@ -19,8 +19,9 @@ type RouteContext = {
 };
 
 /**
- * PATCH /api/journey/steps/{stepId} (F3)
- * Body: { status }. Bearer + active.
+ * PATCH /api/journey/steps/{stepId} (F3 / F4)
+ * Body: { status, expectedUpdatedAt? }. Bearer + active.
+ * Omit expectedUpdatedAt → F3 LWW. Mismatch → 409 CONFLICT + current step.
  */
 export async function PATCH(
   request: Request,
@@ -62,12 +63,34 @@ export async function PATCH(
     }
   }
 
-  const status =
-    parsed !== null &&
-    typeof parsed === "object" &&
-    "status" in (parsed as object)
-      ? (parsed as { status: unknown }).status
-      : undefined;
+  const bodyObj =
+    parsed !== null && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : null;
+
+  const status = bodyObj && "status" in bodyObj ? bodyObj.status : undefined;
+  const expectedUpdatedAt =
+    bodyObj &&
+    typeof bodyObj.expectedUpdatedAt === "string"
+      ? bodyObj.expectedUpdatedAt
+      : bodyObj && bodyObj.expectedUpdatedAt === null
+        ? null
+        : undefined;
+
+  if (
+    bodyObj &&
+    "expectedUpdatedAt" in bodyObj &&
+    bodyObj.expectedUpdatedAt !== undefined &&
+    bodyObj.expectedUpdatedAt !== null &&
+    typeof bodyObj.expectedUpdatedAt !== "string"
+  ) {
+    return jsonError({
+      code: ERROR_CODES.BAD_REQUEST,
+      message: "expectedUpdatedAt must be an ISO string when provided",
+      requestId,
+      status: 400,
+    });
+  }
 
   try {
     const service = createServiceClient();
@@ -84,9 +107,31 @@ export async function PATCH(
       userId: auth.userId,
       stepId,
       status,
+      expectedUpdatedAt,
     });
 
     if (!result.ok) {
+      if (result.code === "CONFLICT") {
+        logger.info("journey step patch conflict", {
+          code: ERROR_CODES.CONFLICT,
+          userId: auth.userId,
+          stepId,
+        });
+        return withRequestId(
+          {
+            error: {
+              code: ERROR_CODES.CONFLICT,
+              message: result.message,
+              requestId,
+            },
+            current: result.current,
+            progress: result.progress,
+            requestId,
+          },
+          409,
+          requestId,
+        );
+      }
       if (result.code === "BAD_STATUS") {
         return jsonError({
           code: ERROR_CODES.BAD_REQUEST,

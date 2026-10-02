@@ -1,6 +1,6 @@
-# Auth API (F2.5 / F2.6 / F2.6p / F2.6r / F3)
+# Auth API (F2.5 / F2.6 / F2.6p / F2.6r / F3 / F4)
 
-Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md), [`runbooks/F2.6r-apple-token-revoke-runbook.md`](./runbooks/F2.6r-apple-token-revoke-runbook.md), [`runbooks/F3-journey-checklist-runbook.md`](./runbooks/F3-journey-checklist-runbook.md). Journey overview: [`journey.md`](./journey.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
+Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md), [`runbooks/F2.6r-apple-token-revoke-runbook.md`](./runbooks/F2.6r-apple-token-revoke-runbook.md), [`runbooks/F3-journey-checklist-runbook.md`](./runbooks/F3-journey-checklist-runbook.md), [`runbooks/F4-sync-merge-runbook.md`](./runbooks/F4-sync-merge-runbook.md). Journey overview: [`journey.md`](./journey.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
 
 ## Verify primitive
 
@@ -24,7 +24,8 @@ Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.
 | `GET /api/journey/paths` | Protected (F3) | Bearer via `requireAccess` + active account |
 | `GET\|POST /api/journey/case` | Protected (F3) | Bearer via `requireAccess` + active account |
 | `GET /api/journey/checklist` | Protected (F3) | Bearer via `requireAccess` + active account |
-| `PATCH /api/journey/steps/{stepId}` | Protected (F3) | Bearer via `requireAccess` + active account |
+| `PATCH /api/journey/steps/{stepId}` | Protected (F3/F4) | Bearer via `requireAccess` + active account |
+| `POST /api/journey/sync` | Protected (F4) | Bearer via `requireAccess` + active account |
 
 ## Protect a new route
 
@@ -88,7 +89,7 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - Full runbook: [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md).
 
 
-## Journey routes (F3)
+## Journey routes (F3 / F4)
 
 All require Bearer `requireAccess` and **active** `internal.users` (`pending_deletion` → `403 ACCOUNT_PENDING_DELETION`; `deleted` → `410 ACCOUNT_DELETED`; no row → `401` Bootstrap required). Service client only — no client-direct grants.
 
@@ -108,11 +109,21 @@ All require Bearer `requireAccess` and **active** `internal.users` (`pending_del
 
 ### `GET /api/journey/checklist`
 
-- **200:** `{ caseId, pathId, catalogVersion, phases, progress, disclaimer, requestId }`
+- **200:** `{ caseId, pathId, catalogVersion, phases, progress, disclaimer, requestId }` — each step includes `status` + `updatedAt` (F4)
 - **404 `NO_JOURNEY_CASE`:** no case yet (client shows path select)
 
-### `PATCH /api/journey/steps/{stepId}`
+### `PATCH /api/journey/steps/{stepId}` (F3/F4)
 
-- **Body:** `{ "status": "not_started" | "in_progress" | "done" }`
+- **Body:** `{ "status": "not_started" | "in_progress" | "done", "expectedUpdatedAt"?: "<iso>" }`
 - **200:** `{ stepId, status, updatedAt, progress, requestId }`
+- **409 `CONFLICT`:** `{ error: { code: "CONFLICT", message, requestId }, current: { stepId, status, updatedAt }, progress, requestId }` when `expectedUpdatedAt` mismatches
+- Omit `expectedUpdatedAt` → F3 last-write-wins (compat); F4 clients should always send it
 - **400:** bad status; **404:** unknown step / no case
+
+### `POST /api/journey/sync` (F4)
+
+- **Body:** `{ "mutations": [{ "opId": "<uuid>", "stepId", "status", "clientUpdatedAt"? }], "hasLocalDraft"?: boolean, "pathId"?: string, "baseCaseUpdatedAt"?: string }`
+- **200:** checklist snapshot fields + `{ appliedOpIds, rejected: [{ opId, code }], requestId }`
+- **409 `MERGE_REQUIRED`:** Case B when `hasLocalDraft` and server journey exists (mirror bootstrap)
+- **404 `NO_JOURNEY_CASE`:** no case and no `pathId` for Case A auto-attach
+- Behavior: monotonic merge per step; replay-safe without `journey_sync_ops` table

@@ -56,6 +56,29 @@ export type UpsertCaseResult =
       message: string;
     };
 
+
+/** True when the user has any journey_cases row (Italy V1: one per country). */
+export async function userHasJourneyCase(
+  service: AccountDbClient,
+  userId: string,
+): Promise<
+  | { ok: true; hasServerJourney: boolean }
+  | { ok: false; code: "DB_ERROR"; message: string }
+> {
+  const db = service.schema("internal");
+  const res = await db
+    .from("journey_cases")
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (res.error) {
+    return { ok: false, code: "DB_ERROR", message: "Failed to check journey case" };
+  }
+  return { ok: true, hasServerJourney: res.data != null };
+}
+
 /** Load the user's Italy case (V1 one per country), or null. */
 export async function getJourneyCase(
   service: AccountDbClient,

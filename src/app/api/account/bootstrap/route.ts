@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/verify-access-token";
 import { log } from "@/lib/log";
 import { getRequestId, REQUEST_ID_HEADER } from "@/lib/request-id";
+import { userHasJourneyCase } from "@/lib/journey/case";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -103,8 +104,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   }
 
-  // --- service_role upsert ---
+  // --- service_role upsert + F4 journey existence ---
   let upsert;
+  let hasServerJourney = false;
   try {
     const service = createServiceClient();
     upsert = await upsertBootstrapIdentity(service, {
@@ -112,6 +114,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       email: user.email ?? null,
       providerSubject,
     });
+    if (upsert.ok) {
+      const journeyCheck = await userHasJourneyCase(service, upsert.userId);
+      if (!journeyCheck.ok) {
+        logger.error("bootstrap journey check failed", {
+          code: ERROR_CODES.INTERNAL_ERROR,
+          userId,
+        });
+        return jsonError({
+          code: ERROR_CODES.INTERNAL_ERROR,
+          message: "Bootstrap failed",
+          requestId,
+          status: 500,
+        });
+      }
+      hasServerJourney = journeyCheck.hasServerJourney;
+    }
   } catch {
     logger.error("bootstrap upsert threw", {
       code: ERROR_CODES.INTERNAL_ERROR,
@@ -163,10 +181,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       status: 500,
     });
   }
-
-  // TODO(F4): set hasServerJourney from exists(journey… where user_id = …).
-  // Until journey tables exist, always false so Case B cannot fire yet.
-  const hasServerJourney = false;
 
   const mergeCase = computeMergeCase({
     hasLocalDraft,

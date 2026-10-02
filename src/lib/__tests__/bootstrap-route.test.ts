@@ -27,6 +27,12 @@ vi.mock("@/lib/account/bootstrap", async () => {
   };
 });
 
+const userHasJourneyCase = vi.fn();
+
+vi.mock("@/lib/journey/case", () => ({
+  userHasJourneyCase: (...args: unknown[]) => userHasJourneyCase(...args),
+}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createServiceClient: () => ({ schema: vi.fn() }),
   createAnonClient: () => ({}),
@@ -90,6 +96,11 @@ describe("POST /api/account/bootstrap", () => {
     resolveAppleProviderSubject.mockReset();
     upsertBootstrapIdentity.mockReset();
     computeMergeCase.mockReset();
+    userHasJourneyCase.mockReset();
+    userHasJourneyCase.mockResolvedValue({
+      ok: true,
+      hasServerJourney: false,
+    });
     process.env.NEXT_PUBLIC_SUPABASE_URL = VALID_ENV.NEXT_PUBLIC_SUPABASE_URL;
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY =
       VALID_ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -245,5 +256,33 @@ describe("POST /api/account/bootstrap", () => {
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.error.code).toBe(ERROR_CODES.ACCOUNT_PENDING_DELETION);
+  });
+
+  it("returns 409 MERGE_REQUIRED when hasLocalDraft and hasServerJourney (Case B)", async () => {
+    verifyAccessToken.mockResolvedValue({
+      ok: true,
+      value: { user: appleUser(), userId: USER_ID, accessToken: "t" },
+    });
+    resolveAppleProviderSubject.mockReturnValue("apple-subject-001");
+    upsertBootstrapIdentity.mockResolvedValue({
+      ok: true,
+      userId: USER_ID,
+      created: false,
+      identityAlreadyLinked: false,
+    });
+    userHasJourneyCase.mockResolvedValue({
+      ok: true,
+      hasServerJourney: true,
+    });
+
+    const res = await POST(
+      bootstrapRequest({ body: { hasLocalDraft: true } }),
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe(ERROR_CODES.MERGE_REQUIRED);
+    expect(body.userId).toBe(USER_ID);
+    expect(body.merge.hasServerJourney).toBe(true);
+    expect(body.merge.case).toBe("B");
   });
 });
