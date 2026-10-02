@@ -1,8 +1,10 @@
 /**
- * F3 checklist join — catalog + step statuses + progress.
+ * F3 / F3.1 checklist join — catalog + step statuses + progress + access flags.
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
+import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
+import { phaseAccess, type PhaseAccess } from "@/lib/billing/catalog";
 import {
   JOURNEY_CATALOG_VERSION,
   JOURNEY_DISCLAIMER,
@@ -25,10 +27,12 @@ export type ChecklistStepView = {
   name: string;
   detail: string;
   status: JourneyStepStatus;
+  access: PhaseAccess;
 };
 
 export type ChecklistPhaseView = {
   name: string;
+  access: PhaseAccess;
   steps: ChecklistStepView[];
 };
 
@@ -38,6 +42,10 @@ export type ChecklistProgress = {
   fraction: number;
 };
 
+export type ChecklistEntitlement = {
+  journeyFull: boolean;
+};
+
 export type ChecklistView = {
   caseId: string;
   pathId: string;
@@ -45,6 +53,7 @@ export type ChecklistView = {
   phases: ChecklistPhaseView[];
   progress: ChecklistProgress;
   disclaimer: string;
+  entitlement: ChecklistEntitlement;
 };
 
 export type GetChecklistResult =
@@ -81,17 +90,24 @@ export function buildChecklistView(args: {
   journeyCase: JourneyCaseView;
   pathId: JourneyPathId;
   states: StepStateRow[];
+  journeyFull?: boolean;
 }): ChecklistView {
   const statusById = new Map(args.states.map((s) => [s.step_id, s.status]));
-  const phases = getPhasesForPath(args.pathId).map((phase) => ({
-    name: phase.name,
-    steps: phase.steps.map((step) => ({
-      id: step.id,
-      name: step.name,
-      detail: step.detail,
-      status: statusById.get(step.id) ?? ("not_started" as JourneyStepStatus),
-    })),
-  }));
+  const journeyFull = args.journeyFull ?? false;
+  const phases = getPhasesForPath(args.pathId).map((phase) => {
+    const access = phaseAccess(phase.name);
+    return {
+      name: phase.name,
+      access,
+      steps: phase.steps.map((step) => ({
+        id: step.id,
+        name: step.name,
+        detail: step.detail,
+        status: statusById.get(step.id) ?? ("not_started" as JourneyStepStatus),
+        access,
+      })),
+    };
+  });
 
   const statuses = phases.flatMap((p) => p.steps.map((s) => s.status));
   return {
@@ -101,6 +117,7 @@ export function buildChecklistView(args: {
     phases,
     progress: computeProgress(statuses),
     disclaimer: JOURNEY_DISCLAIMER,
+    entitlement: { journeyFull },
   };
 }
 
@@ -129,12 +146,16 @@ export async function getChecklist(
   const states = await loadStepStates(service, caseRes.case.caseId);
   if (!states.ok) return states;
 
+  const ent = await hasActiveJourneyFull(service, userId);
+  if (!ent.ok) return ent;
+
   return {
     ok: true,
     checklist: buildChecklistView({
       journeyCase: caseRes.case,
       pathId: caseRes.case.pathId,
       states: states.rows,
+      journeyFull: ent.active,
     }),
   };
 }

@@ -42,6 +42,11 @@ describe("jsonError", () => {
     expect(ERROR_CODES.MERGE_REQUIRED).toBe("MERGE_REQUIRED");
   });
 
+  it("exposes F3.1 ENTITLEMENT_REQUIRED and CONFLICT", () => {
+    expect(ERROR_CODES.ENTITLEMENT_REQUIRED).toBe("ENTITLEMENT_REQUIRED");
+    expect(ERROR_CODES.CONFLICT).toBe("CONFLICT");
+  });
+
   it("supports UNAUTHENTICATED 401", async () => {
     const res = jsonError({
       code: ERROR_CODES.UNAUTHENTICATED,

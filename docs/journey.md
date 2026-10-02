@@ -5,7 +5,8 @@ Server-backed Italy visa progress after login. Runbook: [`runbooks/F3-journey-ch
 ## Scope
 
 - **In:** path select (`italy_digital_nomad` primary; `italy_remote_worker` same stub catalog), ternary step status, server persistence, export + purge wipe.
-- **Out:** billing (F3.1), sync/merge polish (F4.x), Visa Ops / RAG, quiz personalization, multi-country, client-direct table grants, `nomade-prod` apply.
+- **Out:** sync/merge polish (F4.x), Visa Ops / RAG, quiz personalization, multi-country, client-direct table grants, `nomade-prod` apply.
+- **Billing gate (F3.1):** see [`billing.md`](./billing.md) — free Gather Documents; paid Apply + After Arrival via server entitlement.
 
 ## Paths
 
@@ -50,8 +51,16 @@ Fresh case create does **not** import local prototype completions — all steps 
 ## Export / purge
 
 - Export `journey` array: case + step states (F3 fills former empty stub).
-- `wipeJourney(service, userId)` deletes `journey_cases` (steps cascade). Chat/billing wipe stubs remain.
+- `wipeJourney(service, userId)` deletes `journey_cases` (steps cascade).
+- Billing export + `wipeBilling` — see [`billing.md`](./billing.md) (F3.1).
 
 ## Logging
 
 Class C: log `stepId`, status codes, progress counts — never full checklist / detail payloads.
+
+
+## Billing gate (F3.1)
+
+- Free phase: **Gather Documents** (writable without entitlement).
+- Paid phases: **Apply**, **After Arrival** → PATCH without `journey_full` returns `403 ENTITLEMENT_REQUIRED`.
+- Path select + case create remain free. Details: [`billing.md`](./billing.md).
