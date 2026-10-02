@@ -1,6 +1,6 @@
-# Auth API (F2.5 / F2.6 / F2.6p / F2.6r / F3)
+# Auth API (F2.5 / F2.6 / F2.6p / F2.6r / F3 / F3.1)
 
-Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md), [`runbooks/F2.6r-apple-token-revoke-runbook.md`](./runbooks/F2.6r-apple-token-revoke-runbook.md), [`runbooks/F3-journey-checklist-runbook.md`](./runbooks/F3-journey-checklist-runbook.md). Journey overview: [`journey.md`](./journey.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
+Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md), [`runbooks/F2.6r-apple-token-revoke-runbook.md`](./runbooks/F2.6r-apple-token-revoke-runbook.md), [`runbooks/F3-journey-checklist-runbook.md`](./runbooks/F3-journey-checklist-runbook.md), [`runbooks/F3.1-billing-entitlement-runbook.md`](./runbooks/F3.1-billing-entitlement-runbook.md). Journey overview: [`journey.md`](./journey.md). Billing: [`billing.md`](./billing.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
 
 ## Verify primitive
 
@@ -25,6 +25,8 @@ Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.
 | `GET\|POST /api/journey/case` | Protected (F3) | Bearer via `requireAccess` + active account |
 | `GET /api/journey/checklist` | Protected (F3) | Bearer via `requireAccess` + active account |
 | `PATCH /api/journey/steps/{stepId}` | Protected (F3) | Bearer via `requireAccess` + active account |
+| `GET /api/billing/entitlement` | Protected (F3.1) | Bearer via `requireAccess` + active account |
+| `POST /api/billing/app-store/transactions` | Protected (F3.1) | Bearer via `requireAccess` + active account |
 
 ## Protect a new route
 
@@ -57,7 +59,7 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - **Body:** empty / ignored.
 - **Success 200:** sync JSON envelope — `{ exportedAt, userId, deletionStatus, account, identities, journey, chat, billing, notes }`.
   - `account.email` included only when present on `internal.users`; `identities[].providerSubject` included in the file (**never log** it).
-  - `journey` filled when a case exists (F3); `chat` / `billing` empty until those domains ship.
+  - `journey` filled when a case exists (F3); `billing` filled with entitlements + transaction ids only (F3.1, no JWS); `chat` empty until that domain ships.
 - **`pending_deletion`:** still **200** (final copy allowed).
 - **`deleted`:** `410 ACCOUNT_DELETED`.
 - **No user row:** `401 UNAUTHENTICATED` “Bootstrap required”.
@@ -82,7 +84,7 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - **Unauthorized:** `401 UNAUTHENTICATED`. Missing `CRON_SECRET` env → `500 ENV_INVALID`.
 - **Partial failures:** still **200** with `failed > 0`; batch continues.
 - **Eligibility:** `deletion_status = pending_deletion` AND `deleted_at <= now() - 24h`; batch ≤ 50 per run.
-- **Per user:** legal-hold stub (always false) → scrub `email → null` → DELETE `auth_identities` → **F3** `wipeJourney` (delete `journey_cases`, steps cascade) + chat/billing wipe stubs → `auth.admin.deleteUser` (Auth-missing = success) → `deletion_status = deleted` (keep row; leave `deleted_at`).
+- **Per user:** legal-hold stub (always false) → scrub `email → null` → DELETE `auth_identities` → **F3** `wipeJourney` + **F3.1** `wipeBilling` (delete entitlements; strip event `raw_ref`) + chat wipe stub → `auth.admin.deleteUser` (Auth-missing = success) → `deletion_status = deleted` (keep row; leave `deleted_at`).
 - Soft delete does **not** Auth-delete; only this cron does. Apple `/auth/revoke` is **not** called here (F2.6r revokes on soft-delete only). Chat / route / health stay public.
 - Schedule: `vercel.json` cron `0 4 * * *` UTC → `/api/cron/purge-accounts`. Preview may not fire like Production — local/manual curl with Keeper secret is the smoke path.
 - Full runbook: [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md).
@@ -108,7 +110,8 @@ All require Bearer `requireAccess` and **active** `internal.users` (`pending_del
 
 ### `GET /api/journey/checklist`
 
-- **200:** `{ caseId, pathId, catalogVersion, phases, progress, disclaimer, requestId }`
+- **200:** `{ caseId, pathId, catalogVersion, phases, progress, disclaimer, entitlement: { journeyFull }, requestId }`
+  - Each phase/step includes `access: "free" | "paid"` (F3.1). Free = Gather Documents; paid = Apply + After Arrival.
 - **404 `NO_JOURNEY_CASE`:** no case yet (client shows path select)
 
 ### `PATCH /api/journey/steps/{stepId}`
@@ -116,3 +119,21 @@ All require Bearer `requireAccess` and **active** `internal.users` (`pending_del
 - **Body:** `{ "status": "not_started" | "in_progress" | "done" }`
 - **200:** `{ stepId, status, updatedAt, progress, requestId }`
 - **400:** bad status; **404:** unknown step / no case
+- **403 `ENTITLEMENT_REQUIRED`:** paid-phase step without active `journey_full` (F3.1). Gather Documents stays writable without entitlement.
+
+## Billing routes (F3.1)
+
+Same Bearer + **active** account gates as journey. Service client only. Auth / export / delete / purge are **not** gated on entitlement.
+
+### `GET /api/billing/entitlement`
+
+- **200:** `{ entitlements: [{ id, status, grantedAt, updatedAt, sourceTransactionId }], requestId }`
+
+### `POST /api/billing/app-store/transactions`
+
+- **Body:** `{ "signedTransaction": "<StoreKit 2 JWS>", "eventType"?: "purchase" | "restore" }`
+- **200:** `{ entitlement, eventInserted, requestId }` — server verifies JWS; upserts `billing_events` + `entitlements`
+- **400:** bad/unverified JWS, product/bundle mismatch
+- **503 `ENV_INVALID`:** `APP_STORE_JOURNEY_PRODUCT_ID` not set (Keeper / ASC)
+- **Never** trust a client-only paid flag. Product id from env only — never invent ASC ids in code.
+- ASSN V2 webhook deferred to **F3.1b**.

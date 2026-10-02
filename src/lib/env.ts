@@ -36,6 +36,14 @@ export const serverEnvSchema = z
     APPLE_KEY_ID: z.string().trim().min(1).optional(),
     APPLE_PRIVATE_KEY: z.string().trim().min(1).optional(),
     APPLE_CLIENT_ID: z.string().trim().min(1).optional(),
+    /**
+     * F3.1 StoreKit product id from ASC sandbox via Keeper.
+     * Optional at boot (health works). Required inside transaction verify.
+     * NEVER invent / hardcode a fake ASC product id in source.
+     */
+    APP_STORE_JOURNEY_PRODUCT_ID: z.string().trim().min(1).optional(),
+    /** Bundle id expected on verified transactions. Defaults via getter. */
+    APP_STORE_BUNDLE_ID: z.string().trim().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (looksLikeServiceRoleJwt(data.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
@@ -104,6 +112,8 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     APPLE_KEY_ID: source.APPLE_KEY_ID || undefined,
     APPLE_PRIVATE_KEY: source.APPLE_PRIVATE_KEY || undefined,
     APPLE_CLIENT_ID: source.APPLE_CLIENT_ID || undefined,
+    APP_STORE_JOURNEY_PRODUCT_ID: source.APP_STORE_JOURNEY_PRODUCT_ID || undefined,
+    APP_STORE_BUNDLE_ID: source.APP_STORE_BUNDLE_ID || undefined,
   });
 
   if (!result.success) {
@@ -224,3 +234,24 @@ export function cronAuthorizationMatches(
   return timingSafeEqual(a, b);
 }
 
+
+export type AppStoreBillingEnv = {
+  journeyProductId: string;
+  bundleId: string;
+};
+
+const DEFAULT_APP_STORE_BUNDLE_ID = "com.izaya.Nomade";
+
+/**
+ * F3.1 App Store billing config.
+ * journeyProductId must come from Keeper/ASC — empty means MISCONFIGURED at verify time.
+ * bundleId defaults to com.izaya.Nomade (public App ID).
+ */
+export function getAppStoreBillingConfig(
+  source: EnvSource = process.env,
+): AppStoreBillingEnv {
+  const journeyProductId = optionalTrimmed(source.APP_STORE_JOURNEY_PRODUCT_ID) ?? "";
+  const bundleId =
+    optionalTrimmed(source.APP_STORE_BUNDLE_ID) ?? DEFAULT_APP_STORE_BUNDLE_ID;
+  return { journeyProductId, bundleId };
+}

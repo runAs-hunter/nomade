@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { ERROR_CODES, jsonError } from "@/lib/api-error";
 import { requireAccess } from "@/lib/auth/require-access";
+import { processAppStoreTransaction } from "@/lib/billing/transactions";
+import { getAppStoreBillingConfig } from "@/lib/env";
 import { requireActiveJourneyAccount } from "@/lib/journey/access";
 import {
   activeAccountErrorResponse,
   withRequestId,
 } from "@/lib/journey/http";
-import { patchStepStatus } from "@/lib/journey/steps";
 import { log } from "@/lib/log";
 import { getRequestId } from "@/lib/request-id";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -14,38 +15,22 @@ import { createServiceClient } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type RouteContext = {
-  params: Promise<{ stepId: string }>;
-};
-
 /**
- * PATCH /api/journey/steps/{stepId} (F3)
- * Body: { status }. Bearer + active.
+ * POST /api/billing/app-store/transactions (F3.1)
+ * Body: { signedTransaction: "<JWS>", eventType?: "purchase"|"restore" }
+ * Verifies StoreKit 2 JWS server-side; upserts billing_events + entitlements.
+ * Never trusts a client-only "I paid" flag.
  */
-export async function PATCH(
-  request: Request,
-  context: RouteContext,
-): Promise<NextResponse> {
+export async function POST(request: Request): Promise<NextResponse> {
   const requestId = getRequestId(request);
   const logger = log.child({ requestId });
-  const { stepId: rawStepId } = await context.params;
-  const stepId = decodeURIComponent(rawStepId ?? "").trim();
 
   const auth = await requireAccess(request, {
     requestId,
     logger,
-    failMessage: "journey step patch unauthenticated",
+    failMessage: "billing transaction unauthenticated",
   });
   if (auth instanceof NextResponse) return auth;
-
-  if (!stepId) {
-    return jsonError({
-      code: ERROR_CODES.BAD_REQUEST,
-      message: "Missing stepId",
-      requestId,
-      status: 400,
-    });
-  }
 
   let parsed: unknown = null;
   const raw = await request.text();
@@ -62,32 +47,35 @@ export async function PATCH(
     }
   }
 
-  const status =
-    parsed !== null &&
-    typeof parsed === "object" &&
-    "status" in (parsed as object)
-      ? (parsed as { status: unknown }).status
-      : undefined;
+  const body =
+    parsed !== null && typeof parsed === "object"
+      ? (parsed as {
+          signedTransaction?: unknown;
+          signedTransactionInfo?: unknown;
+          eventType?: unknown;
+        })
+      : {};
 
   try {
     const service = createServiceClient();
     const account = await requireActiveJourneyAccount(service, auth.userId);
     if (!account.ok) {
-      logger.info("journey step patch account refused", {
+      logger.info("billing transaction account refused", {
         code: account.code,
         userId: auth.userId,
       });
       return activeAccountErrorResponse(account, requestId);
     }
 
-    const result = await patchStepStatus(service, {
+    const config = getAppStoreBillingConfig();
+    const result = await processAppStoreTransaction(service, {
       userId: auth.userId,
-      stepId,
-      status,
+      body,
+      config,
     });
 
     if (!result.ok) {
-      if (result.code === "BAD_STATUS") {
+      if (result.code === "BAD_REQUEST") {
         return jsonError({
           code: ERROR_CODES.BAD_REQUEST,
           message: result.message,
@@ -95,71 +83,68 @@ export async function PATCH(
           status: 400,
         });
       }
-      if (result.code === "NO_JOURNEY_CASE") {
+      if (
+        result.code === "UNVERIFIED" ||
+        result.code === "PRODUCT_MISMATCH" ||
+        result.code === "BUNDLE_MISMATCH"
+      ) {
         return jsonError({
-          code: ERROR_CODES.NO_JOURNEY_CASE,
+          code: ERROR_CODES.BAD_REQUEST,
           message: result.message,
           requestId,
-          status: 404,
+          status: 400,
         });
       }
-      if (result.code === "UNKNOWN_STEP") {
+      if (result.code === "MISCONFIGURED") {
+        logger.error("billing transaction misconfigured", {
+          code: ERROR_CODES.ENV_INVALID,
+          userId: auth.userId,
+        });
         return jsonError({
-          code: ERROR_CODES.NOT_FOUND,
+          code: ERROR_CODES.ENV_INVALID,
           message: result.message,
           requestId,
-          status: 404,
+          status: 503,
         });
       }
-      if (result.code === "ENTITLEMENT_REQUIRED") {
-        return jsonError({
-          code: ERROR_CODES.ENTITLEMENT_REQUIRED,
-          message: result.message,
-          requestId,
-          status: 403,
-        });
-      }
-      logger.error("journey step patch failed", {
+      logger.error("billing transaction failed", {
         code: ERROR_CODES.INTERNAL_ERROR,
         userId: auth.userId,
-        stepId,
-        patchCode: result.code,
+        txCode: result.code,
       });
       return jsonError({
         code: ERROR_CODES.INTERNAL_ERROR,
-        message: "Failed to update step",
+        message: "Failed to record transaction",
         requestId,
         status: 500,
       });
     }
 
-    logger.info("journey step patch ok", {
+    // Log ids only — never JWS (Class E).
+    logger.info("billing transaction ok", {
       userId: auth.userId,
-      stepId: result.stepId,
-      status: result.status,
-      done: result.progress.done,
-      total: result.progress.total,
+      entitlementId: result.entitlement.id,
+      status: result.entitlement.status,
+      eventInserted: result.eventInserted,
+      sourceTransactionId: result.entitlement.sourceTransactionId,
     });
     return withRequestId(
       {
-        stepId: result.stepId,
-        status: result.status,
-        updatedAt: result.updatedAt,
-        progress: result.progress,
+        entitlement: result.entitlement,
+        eventInserted: result.eventInserted,
         requestId,
       },
       200,
       requestId,
     );
   } catch {
-    logger.error("journey step patch threw", {
+    logger.error("billing transaction threw", {
       code: ERROR_CODES.INTERNAL_ERROR,
       userId: auth.userId,
-      stepId,
     });
     return jsonError({
       code: ERROR_CODES.INTERNAL_ERROR,
-      message: "Unexpected step update failure",
+      message: "Unexpected transaction failure",
       requestId,
       status: 500,
     });

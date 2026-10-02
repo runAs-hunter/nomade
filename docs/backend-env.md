@@ -61,3 +61,13 @@ iOS and browser clients receive **anon/publishable** only. Service role stays on
 - Local DB layout: [`supabase-local.md`](./supabase-local.md)
 - Roles / RLS: [`supabase-roles-rls.md`](./supabase-roles-rls.md)
 - Vercel Preview (F1.7): [`vercel-preview.md`](./vercel-preview.md)
+
+
+## App Store billing (F3.1)
+
+| Var | Required | Notes |
+|---|---|---|
+| `APP_STORE_JOURNEY_PRODUCT_ID` | For transaction verify | ASC sandbox id via Keeper — **never invent in chat/code** |
+| `APP_STORE_BUNDLE_ID` | Optional | Defaults to `com.izaya.Nomade` |
+
+See [`billing.md`](./billing.md). ASSN secrets deferred to F3.1b.
