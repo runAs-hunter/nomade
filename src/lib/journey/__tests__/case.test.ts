@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { upsertJourneyCase, getJourneyCase } from "@/lib/journey/case";
+import {
+  upsertJourneyCase,
+  getJourneyCase,
+  insertMissingCatalogSteps,
+} from "@/lib/journey/case";
+import { getChecklist } from "@/lib/journey/checklist";
 import { listStepDefsForPath } from "@/lib/journey/catalog";
 
 const USER_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
@@ -221,5 +226,66 @@ describe("upsertJourneyCase", () => {
     expect(got.ok).toBe(true);
     if (!got.ok) return;
     expect(got.case?.caseId).toBe("case-1");
+  });
+});
+
+describe("insertMissingCatalogSteps", () => {
+  it("inserts missing catalog ids as not_started and keeps existing rows", async () => {
+    const state = {
+      cases: [
+        {
+          id: "case-1",
+          user_id: USER_ID,
+          path_id: "italy_digital_nomad",
+          country_code: "IT",
+          created_at: NOW,
+          updated_at: NOW,
+        },
+      ] as FakeRow[],
+      steps: [
+        {
+          id: "s1",
+          case_id: "case-1",
+          step_id: "passport",
+          status: "done",
+          updated_at: NOW,
+        },
+        {
+          id: "orphan",
+          case_id: "case-1",
+          step_id: "legacy-orphan",
+          status: "in_progress",
+          updated_at: NOW,
+        },
+      ] as FakeRow[],
+    };
+    const res = await insertMissingCatalogSteps(
+      makeJourneyService(state),
+      "case-1",
+      "italy_digital_nomad",
+      state.steps.map((s) => String(s.step_id)),
+      NOW,
+    );
+    expect(res.ok).toBe(true);
+    const passport = state.steps.find((s) => s.step_id === "passport");
+    expect(passport?.status).toBe("done");
+    const orphan = state.steps.find((s) => s.step_id === "legacy-orphan");
+    expect(orphan?.status).toBe("in_progress");
+    const ids = state.steps.map((s) => s.step_id);
+    expect(ids).toContain("partita-iva");
+    expect(ids).toContain("highly-qualified");
+    expect(ids).not.toContain("employment-contract");
+    expect(
+      state.steps
+        .filter((s) => s.step_id !== "passport" && s.step_id !== "legacy-orphan")
+        .every((s) => s.status === "not_started"),
+    ).toBe(true);
+
+    const checklist = await getChecklist(makeJourneyService(state), USER_ID);
+    expect(checklist.ok).toBe(true);
+    if (!checklist.ok) return;
+    expect(checklist.checklist.phases.flatMap((ph) => ph.steps).some((s) => s.id === "partita-iva")).toBe(true);
+    expect(state.steps.find((s) => s.step_id === "passport")?.status).toBe("done");
+    expect(state.steps.find((s) => s.step_id === "legacy-orphan")).toBeTruthy();
   });
 });

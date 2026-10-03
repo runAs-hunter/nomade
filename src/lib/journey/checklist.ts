@@ -13,7 +13,11 @@ import {
   type JourneyPathId,
   type JourneyStepStatus,
 } from "@/lib/journey/catalog";
-import { getJourneyCase, type JourneyCaseView } from "@/lib/journey/case";
+import {
+  getJourneyCase,
+  insertMissingCatalogSteps,
+  type JourneyCaseView,
+} from "@/lib/journey/case";
 
 export type StepStateRow = {
   step_id: string;
@@ -137,12 +141,34 @@ export async function getChecklist(
   const states = await loadStepStates(service, caseRes.case.caseId);
   if (!states.ok) return states;
 
+  // Existing cases keep their rows. New catalog ids are inserted not_started.
+  const nowIso = new Date().toISOString();
+  const backfill = await insertMissingCatalogSteps(
+    service,
+    caseRes.case.caseId,
+    caseRes.case.pathId,
+    states.rows.map((r) => r.step_id),
+    nowIso,
+  );
+  if (!backfill.ok) {
+    return { ok: false, code: "DB_ERROR", message: backfill.message };
+  }
+
+  const rows = states.rows.slice();
+  for (const inserted of backfill.inserted) {
+    rows.push({
+      step_id: inserted.step_id,
+      status: "not_started",
+      updated_at: inserted.updated_at,
+    });
+  }
+
   return {
     ok: true,
     checklist: buildChecklistView({
       journeyCase: caseRes.case,
       pathId: caseRes.case.pathId,
-      states: states.rows,
+      states: rows,
     }),
   };
 }

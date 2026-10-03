@@ -115,7 +115,9 @@ describe("patchStepStatus", () => {
     expect(res.stepId).toBe("passport");
     expect(res.status).toBe("done");
     expect(res.progress.done).toBe(1);
-    expect(res.progress.total).toBe(13);
+    expect(res.progress.total).toBe(
+      listStepDefsForPath("italy_digital_nomad").length,
+    );
     expect(state.steps.find((s) => s.step_id === "passport")?.status).toBe(
       "done",
     );
@@ -168,7 +170,9 @@ describe("buildChecklistView", () => {
     });
     expect(view.disclaimer).toMatch(/not legal advice/i);
     expect(view.progress.done).toBe(1);
-    expect(view.progress.total).toBe(13);
+    expect(view.progress.total).toBe(
+      listStepDefsForPath("italy_digital_nomad").length,
+    );
     const passport = view.phases[0].steps.find((s) => s.id === "passport");
     expect(passport?.status).toBe("done");
     expect(passport?.updatedAt).toBe(NOW);
