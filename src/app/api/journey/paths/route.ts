@@ -3,6 +3,7 @@ import { ERROR_CODES, jsonError } from "@/lib/api-error";
 import { requireAccess } from "@/lib/auth/require-access";
 import { requireActiveJourneyAccount } from "@/lib/journey/access";
 import { listJourneyPaths } from "@/lib/journey/catalog";
+import { listUsConsulatePosts } from "@/lib/journey/consulates";
 import {
   activeAccountErrorResponse,
   withRequestId,
@@ -41,11 +42,17 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     const paths = listJourneyPaths();
+    const usConsulatePosts = listUsConsulatePosts();
     logger.info("journey paths ok", {
       userId: auth.userId,
       pathCount: paths.length,
+      consulatePostCount: usConsulatePosts.length,
     });
-    return withRequestId({ paths, requestId }, 200, requestId);
+    return withRequestId(
+      { paths, usConsulatePosts, requestId },
+      200,
+      requestId,
+    );
   } catch {
     logger.error("journey paths threw", {
       code: ERROR_CODES.INTERNAL_ERROR,

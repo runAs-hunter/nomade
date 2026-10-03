@@ -101,6 +101,44 @@ export async function getJourneyCase(
   return { ok: true, case: row ? toCaseView(row) : null };
 }
 
+/**
+ * F5 additive seed: insert catalog step ids that an existing case does not
+ * have yet. Status is not_started. Does not delete orphan rows and does not
+ * update existing statuses (no progress reset, no migration).
+ */
+export async function insertMissingCatalogSteps(
+  service: AccountDbClient,
+  caseId: string,
+  pathId: JourneyPathId,
+  existingStepIds: readonly string[],
+  nowIso: string,
+): Promise<
+  | { ok: true; inserted: { step_id: string; updated_at: string }[] }
+  | { ok: false; message: string }
+> {
+  const have = new Set(existingStepIds);
+  const missing = listStepDefsForPath(pathId).filter((s) => !have.has(s.id));
+  if (missing.length === 0) {
+    return { ok: true, inserted: [] };
+  }
+
+  const db = service.schema("internal");
+  const rows = missing.map((s) => ({
+    case_id: caseId,
+    step_id: s.id,
+    status: "not_started" as const,
+    updated_at: nowIso,
+  }));
+  const ins = await db.from("journey_step_states").insert(rows);
+  if (ins.error) {
+    return { ok: false, message: "Failed to add missing journey steps" };
+  }
+  return {
+    ok: true,
+    inserted: rows.map((r) => ({ step_id: r.step_id, updated_at: r.updated_at })),
+  };
+}
+
 async function seedStepStates(
   service: AccountDbClient,
   caseId: string,
