@@ -12,6 +12,7 @@ Typed validation lives in `src/lib/env.ts`. Supabase server clients: `src/lib/su
 | `SUPABASE_PROJECT_REF` | No | Optional | e.g. `bgdrzdlenmwbpalnjiqg` for diagnostics |
 | `ANTHROPIC_API_KEY` | Yes | Optional at boot | Required only when chat/model routes run; health must work without it |
 | `CRON_SECRET` | **Yes** | Optional at boot; **required** inside cron routes | F2.6p `GET\|POST /api/cron/purge-accounts`. Value from Keeper; never commit. Vercel Cron sends `Authorization: Bearer ${CRON_SECRET}` |
+| `SOURCES_ADMIN_USER_IDS` | No (user UUIDs) | Optional | F8 `/api/sources` writes. Comma-separated Supabase Auth user UUIDs of Cap-approved admins. Unset → only the service-role Bearer can write. `CRON_SECRET` also gates `GET\|POST /api/cron/check-sources` (F8, manual trigger) |
 | `APPLE_TEAM_ID` | No (still Keeper) | Optional at boot; **required** inside Apple revoke | F2.6r. Expect Team ID from Membership (Xcode default `LXT8T4YQR6` — confirm). Preview / local only |
 | `APPLE_KEY_ID` | No (still Keeper) | Optional at boot; **required** inside Apple revoke | 10-char Sign in with Apple Key ID. Preview / local only |
 | `APPLE_PRIVATE_KEY` | **Yes** | Optional at boot; **required** inside Apple revoke | `.p8` PEM from Keeper. Never git/chat/logs. Preview / `nomade-dev` only — **not** `nomade-prod` |
