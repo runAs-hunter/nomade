@@ -27,6 +27,12 @@ export const serverEnvSchema = z
      */
     CRON_SECRET: z.string().trim().min(1).optional(),
     /**
+     * F8 Official Sources admin writes. Optional comma-separated Supabase Auth
+     * user UUIDs (Cap-approved admins). Unset → only the service-role Bearer
+     * may write. Read inside getSourcesAdminUserIds().
+     */
+    SOURCES_ADMIN_USER_IDS: z.string().trim().min(1).optional(),
+    /**
      * F2.6r Apple SIWA revoke. Optional at boot (health still works).
      * Required together inside getAppleSiwaConfig() when revoking.
      * APPLE_CLIENT_ID is the App ID (com.izaya.Nomade) — not a Services ID.
@@ -100,6 +106,7 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     SUPABASE_PROJECT_REF: source.SUPABASE_PROJECT_REF || undefined,
     ANTHROPIC_API_KEY: source.ANTHROPIC_API_KEY || undefined,
     CRON_SECRET: source.CRON_SECRET || undefined,
+    SOURCES_ADMIN_USER_IDS: source.SOURCES_ADMIN_USER_IDS || undefined,
     APPLE_TEAM_ID: source.APPLE_TEAM_ID || undefined,
     APPLE_KEY_ID: source.APPLE_KEY_ID || undefined,
     APPLE_PRIVATE_KEY: source.APPLE_PRIVATE_KEY || undefined,
@@ -224,3 +231,33 @@ export function cronAuthorizationMatches(
   return timingSafeEqual(a, b);
 }
 
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * F8: Cap-approved admin user ids for /api/sources writes.
+ * Comma/whitespace separated UUIDs; invalid entries ignored. Empty when unset.
+ */
+export function getSourcesAdminUserIds(
+  source: EnvSource = process.env,
+): string[] {
+  const raw = source.SOURCES_ADMIN_USER_IDS;
+  if (typeof raw !== "string") return [];
+  return raw
+    .split(/[\s,]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => UUID_RE.test(s));
+}
+
+/**
+ * Constant-time compare of a Bearer token against a server secret.
+ * Never logs either value. False on empty/mismatched length.
+ */
+export function secretTokenMatches(token: string | null, secret: string): boolean {
+  if (!token || !secret) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(secret);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
