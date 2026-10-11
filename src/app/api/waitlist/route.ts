@@ -3,6 +3,10 @@ import { getServerEnv, resetServerEnvCache } from "@/lib/env";
 import { createServiceClient } from "@/lib/supabase/server";
 import { WAITLIST_COPY } from "@/lib/waitlist/copy";
 import {
+  ownHostsFromRequest,
+  sanitizeWaitlistAttribution,
+} from "@/lib/waitlist/attribution";
+import {
   isNomadeProdSupabaseUrl,
   isUniqueViolation,
   normalizeWaitlistEmail,
@@ -29,8 +33,9 @@ function success(): NextResponse<WaitlistBody> {
 }
 
 /**
- * Public homepage waitlist. Stores the address only.
- * Does not send email. Refuses nomade-prod. nomade-dev (and local) only.
+ * Public homepage waitlist. Stores the address plus best-effort attribution
+ * (utm_* + referrer host). Invalid attribution is dropped, never rejected.
+ * No IP, no user agent. Does not send email. Refuses nomade-prod. nomade-dev (and local) only.
  */
 export async function POST(request: Request): Promise<NextResponse<WaitlistBody>> {
   let payload: unknown;
@@ -49,6 +54,14 @@ export async function POST(request: Request): Promise<NextResponse<WaitlistBody>
     return failure(400);
   }
 
+  // Never throws; invalid values become null so attribution can't fail a signup.
+  let attribution: ReturnType<typeof sanitizeWaitlistAttribution>;
+  try {
+    attribution = sanitizeWaitlistAttribution(payload, ownHostsFromRequest(request));
+  } catch {
+    attribution = sanitizeWaitlistAttribution(null);
+  }
+
   let supabaseUrl: string;
   try {
     resetServerEnvCache();
@@ -63,10 +76,20 @@ export async function POST(request: Request): Promise<NextResponse<WaitlistBody>
 
   try {
     const client = createServiceClient();
-    const { error } = await client
-      .schema("internal")
-      .from("waitlist_signups")
-      .insert({ email });
+    const insert = (row: { email: string } & Partial<typeof attribution>) =>
+      client.schema("internal").from("waitlist_signups").insert(row);
+
+    let { error } = await insert({ email, ...attribution });
+
+    // Attribution must never fail a signup: if the row with attribution was
+    // refused for any reason other than a duplicate, retry with the email only.
+    if (
+      error &&
+      !isUniqueViolation(error) &&
+      Object.values(attribution).some((v) => v !== null)
+    ) {
+      ({ error } = await insert({ email }));
+    }
 
     if (error) {
       if (isUniqueViolation(error)) {

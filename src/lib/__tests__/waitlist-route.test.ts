@@ -28,10 +28,18 @@ const VALID = {
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU",
 };
 
-function post(body: unknown): Request {
+const NO_ATTRIBUTION = {
+  utm_source: null,
+  utm_medium: null,
+  utm_campaign: null,
+  utm_content: null,
+  referrer_host: null,
+};
+
+function post(body: unknown, headers: Record<string, string> = {}): Request {
   return new Request("http://localhost/api/waitlist", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
@@ -168,6 +176,167 @@ describe("POST /api/waitlist", () => {
     expect(schemaMock).toHaveBeenCalledWith("internal");
     expect(fromMock).toHaveBeenCalledWith("waitlist_signups");
     expect(insertMock).toHaveBeenCalledTimes(1);
-    expect(insertMock).toHaveBeenCalledWith({ email: "ada@example.com" });
+    expect(insertMock).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      ...NO_ATTRIBUTION,
+    });
+  });
+});
+
+describe("POST /api/waitlist attribution", () => {
+  const prev = { ...process.env };
+
+  beforeEach(() => {
+    resetServerEnvCache();
+    insertMock.mockReset();
+    createServiceClientMock.mockClear();
+    insertMock.mockResolvedValue({ error: null });
+    process.env.NEXT_PUBLIC_SUPABASE_URL = VALID.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = VALID.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = VALID.SUPABASE_SERVICE_ROLE_KEY;
+  });
+
+  afterEach(() => {
+    resetServerEnvCache();
+    for (const k of Object.keys(process.env)) {
+      if (!(k in prev)) delete process.env[k];
+    }
+    Object.assign(process.env, prev);
+  });
+
+  async function expectSuccess(res: Response) {
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, message: WAITLIST_COPY.success });
+  }
+
+  it("stores UTMs and the referrer host (trimmed + lowercased)", async () => {
+    const res = await POST(
+      post({
+        email: "ada@example.com",
+        utm_source: "  Reddit ",
+        utm_medium: "social",
+        utm_campaign: "Italy_DNV-2026.10",
+        utm_content: "post-1",
+        referrer_host: "www.Reddit.com",
+      }),
+    );
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(insertMock).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      utm_source: "reddit",
+      utm_medium: "social",
+      utm_campaign: "italy_dnv-2026.10",
+      utm_content: "post-1",
+      referrer_host: "www.reddit.com",
+    });
+  });
+
+  it("still works without any UTMs", async () => {
+    const res = await POST(post({ email: "ada@example.com" }));
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      ...NO_ATTRIBUTION,
+    });
+  });
+
+  it("drops junk attribution and the signup still succeeds", async () => {
+    const res = await POST(
+      post({
+        email: "ada@example.com",
+        utm_source: "bad source!<script>",
+        utm_medium: "x".repeat(101),
+        utm_campaign: 12345,
+        utm_content: { nested: "object" },
+        referrer_host: "https://evil.example.com/path?q=1",
+      }),
+    );
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(insertMock).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      ...NO_ATTRIBUTION,
+    });
+  });
+
+  it("drops other wrong types (arrays, booleans, null, empty) without failing", async () => {
+    const res = await POST(
+      post({
+        email: "ada@example.com",
+        utm_source: ["reddit"],
+        utm_medium: true,
+        utm_campaign: null,
+        utm_content: "   ",
+        referrer_host: "",
+      }),
+    );
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      ...NO_ATTRIBUTION,
+    });
+  });
+
+  it("keeps valid fields while dropping invalid ones; accepts exactly 100 chars", async () => {
+    const res = await POST(
+      post({
+        email: "ada@example.com",
+        utm_source: "a".repeat(100),
+        utm_medium: "a".repeat(101),
+      }),
+    );
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledWith({
+      ...NO_ATTRIBUTION,
+      email: "ada@example.com",
+      utm_source: "a".repeat(100),
+    });
+  });
+
+  it("drops the referrer host when it is the site's own host", async () => {
+    const res = await POST(
+      post(
+        { email: "ada@example.com", referrer_host: "www.nomade-eight.vercel.app" },
+        { host: "nomade-eight.vercel.app" },
+      ),
+    );
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      ...NO_ATTRIBUTION,
+    });
+
+    insertMock.mockClear();
+    await expectSuccess(
+      await POST(post({ email: "ada@example.com", referrer_host: "localhost" })),
+    );
+    expect(insertMock).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      ...NO_ATTRIBUTION,
+    });
+  });
+
+  it("an invalid email is still rejected even with valid UTMs", async () => {
+    const res = await POST(post({ email: "nope", utm_source: "reddit" }));
+    expect(res.status).toBe(400);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("retries with the email only if the attributed insert is refused", async () => {
+    insertMock
+      .mockResolvedValueOnce({ error: { code: "42703", message: "column does not exist" } })
+      .mockResolvedValueOnce({ error: null });
+    const res = await POST(post({ email: "ada@example.com", utm_source: "reddit" }));
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledTimes(2);
+    expect(insertMock).toHaveBeenLastCalledWith({ email: "ada@example.com" });
+  });
+
+  it("does not retry on a duplicate email (still success)", async () => {
+    insertMock.mockResolvedValue({ error: { code: "23505", message: "duplicate" } });
+    const res = await POST(post({ email: "ada@example.com", utm_source: "reddit" }));
+    await expectSuccess(res);
+    expect(insertMock).toHaveBeenCalledTimes(1);
   });
 });

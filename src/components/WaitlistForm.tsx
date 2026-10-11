@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/Button";
 import { WAITLIST_COPY } from "@/lib/waitlist/copy";
+import { readBrowserAttribution } from "@/lib/waitlist/attribution-client";
 
 type Status = "idle" | "saving" | "success" | "error";
 
@@ -17,7 +18,7 @@ export function WaitlistForm() {
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ ...readBrowserAttribution(), email }),
       });
       if (!res.ok) {
         setStatus("error");
