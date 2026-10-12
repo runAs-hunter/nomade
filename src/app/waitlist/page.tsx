@@ -4,9 +4,11 @@ import { WAITLIST_COPY } from "@/lib/waitlist/copy";
 
 export const metadata: Metadata = {
   description: WAITLIST_COPY.subhead,
+  alternates: { canonical: "https://nomadevisa.com/" },
+  robots: { index: false },
 };
 
-export default function LandingPage() {
+export default function WaitlistPage() {
   return (
     <main className="min-h-screen bg-[var(--bg)]">
       <div className="app-container py-[var(--space-12)] md:py-16">
