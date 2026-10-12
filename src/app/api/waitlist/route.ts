@@ -7,6 +7,10 @@ import {
   sanitizeWaitlistAttribution,
 } from "@/lib/waitlist/attribution";
 import {
+  isHoneypotFilled,
+  sanitizeFakeDoorFields,
+} from "@/lib/waitlist/fake-door";
+import {
   isNomadeProdSupabaseUrl,
   isUniqueViolation,
   normalizeWaitlistEmail,
@@ -34,7 +38,9 @@ function success(): NextResponse<WaitlistBody> {
 
 /**
  * Public homepage waitlist. Stores the address plus best-effort attribution
- * (utm_* + referrer host). Invalid attribution is dropped, never rejected.
+ * (utm_* + referrer host) and optional fake-door fields (tier, path, move_date,
+ * source). Invalid optional values are dropped, never rejected. A filled
+ * "company" honeypot gets a fake success and nothing is stored.
  * No IP, no user agent. Does not send email. Refuses nomade-prod. nomade-dev (and local) only.
  */
 export async function POST(request: Request): Promise<NextResponse<WaitlistBody>> {
@@ -54,12 +60,24 @@ export async function POST(request: Request): Promise<NextResponse<WaitlistBody>
     return failure(400);
   }
 
+  // Honeypot: bots fill the hidden "company" field. Pretend success, store nothing.
+  if (isHoneypotFilled(payload)) {
+    return success();
+  }
+
   // Never throws; invalid values become null so attribution can't fail a signup.
   let attribution: ReturnType<typeof sanitizeWaitlistAttribution>;
   try {
     attribution = sanitizeWaitlistAttribution(payload, ownHostsFromRequest(request));
   } catch {
     attribution = sanitizeWaitlistAttribution(null);
+  }
+
+  let fakeDoor: ReturnType<typeof sanitizeFakeDoorFields>;
+  try {
+    fakeDoor = sanitizeFakeDoorFields(payload);
+  } catch {
+    fakeDoor = sanitizeFakeDoorFields(null);
   }
 
   let supabaseUrl: string;
@@ -76,19 +94,25 @@ export async function POST(request: Request): Promise<NextResponse<WaitlistBody>
 
   try {
     const client = createServiceClient();
-    const insert = (row: { email: string } & Partial<typeof attribution>) =>
+    type Row = { email: string } & Partial<typeof attribution> &
+      Partial<typeof fakeDoor>;
+    const insert = (row: Row) =>
       client.schema("internal").from("waitlist_signups").insert(row);
+    const hasAny = (o: Record<string, string | null>) =>
+      Object.values(o).some((v) => v !== null);
 
-    let { error } = await insert({ email, ...attribution });
+    // Optional fields must never fail a signup. Try the richest row first,
+    // then fall back on any non-duplicate error: without the fake-door columns
+    // (migration 20261012120000 not applied yet), then email only.
+    const attempts: Row[] = [];
+    if (hasAny(fakeDoor)) attempts.push({ email, ...attribution, ...fakeDoor });
+    attempts.push({ email, ...attribution });
+    if (hasAny(attribution)) attempts.push({ email });
 
-    // Attribution must never fail a signup: if the row with attribution was
-    // refused for any reason other than a duplicate, retry with the email only.
-    if (
-      error &&
-      !isUniqueViolation(error) &&
-      Object.values(attribution).some((v) => v !== null)
-    ) {
-      ({ error } = await insert({ email }));
+    let error: Awaited<ReturnType<typeof insert>>["error"] = null;
+    for (const row of attempts) {
+      ({ error } = await insert(row));
+      if (!error || isUniqueViolation(error)) break;
     }
 
     if (error) {
