@@ -85,3 +85,50 @@ if (reduce || !window.gsap) {
 document.querySelectorAll('#faq details').forEach((d, i) => d.addEventListener('toggle', () => { if (d.open) trackEvent('faq_open', { q: String(i + 1) }); }));
 const seenSteps = new Set();
 new MutationObserver(() => { const n = seq.textContent.slice(0, 2); if (!seenSteps.has(n)) { seenSteps.add(n); trackEvent('hero_step', { step: n }); } }).observe(seq, { childList: true });
+
+/* ===== Italy media (task/landing-italy-media) ===== */
+/* Intro: once per session, skippable, reduced-motion aware, hard cap ~2.5s. */
+(function intro() {
+  const root = document.documentElement, el = document.getElementById('intro');
+  if (!el) return;
+  if (!root.classList.contains('has-intro') || reduce || !window.gsap) { root.classList.remove('has-intro'); el.remove(); return; }
+  try { sessionStorage.setItem('nm-intro', '1'); } catch (_) {}
+  el.hidden = false;
+  const veil = el.querySelector('.intro-veil'), mark = el.querySelector('.intro-mark');
+  const pr = document.getElementById('passport').getBoundingClientRect();
+  veil.style.setProperty('--cx', (pr.left + pr.width / 2) + 'px'); veil.style.setProperty('--cy', (pr.top + pr.height / 2) + 'px');
+  const R = Math.hypot(innerWidth, innerHeight);
+  let done = false;
+  const tl = gsap.timeline({ onComplete: end });
+  tl.from(mark, { duration: .45, opacity: 0, scale: .6, ease: 'expo.out' })
+    .to(mark, { duration: .3, opacity: 0, scale: 1.6, ease: 'power2.in' }, .55)
+    .fromTo(veil, { '--r': '0px' }, { '--r': R + 'px', duration: 1.25, ease: 'expo.inOut' }, .7)
+    .fromTo('.scene', { scale: .32 }, { scale: 1, duration: 1.35, ease: 'expo.inOut', clearProps: 'transform' }, .65);
+  function end() {
+    if (done) return; done = true; tl.progress(1); tl.kill(); gsap.set('.scene', { clearProps: 'transform' });
+    root.classList.remove('has-intro'); el.remove();
+    removeEventListener('keydown', end); removeEventListener('wheel', end); removeEventListener('touchstart', end);
+  }
+  document.getElementById('intro-skip').addEventListener('click', end);
+  addEventListener('keydown', end, { once: true }); addEventListener('wheel', end, { once: true, passive: true }); addEventListener('touchstart', end, { once: true, passive: true });
+  setTimeout(end, 2500); // never block content longer than ~2.5s
+})();
+
+/* Media: lazy video with poster fallback on save-data / slow links / reduced motion */
+(function media() {
+  const c = navigator.connection || {};
+  const lite = reduce || c.saveData || /(^|-)2g|3g/.test(c.effectiveType || '');
+  document.querySelectorAll('video[data-lazy-video]').forEach(v => {
+    const vio = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) {
+        if (!v.poster) v.poster = v.dataset.poster; // poster lazy too
+        if (lite) { vio.disconnect(); return; } // save-data / slow link / reduced motion: poster only
+        if (!v.dataset.loaded) { v.dataset.loaded = '1'; v.preload = 'metadata'; v.querySelectorAll('source').forEach(s => { s.src = s.dataset.src; }); v.load(); }
+        v.play().catch(() => {});
+      } else if (v.dataset.loaded) v.pause();
+    }), { rootMargin: '200px 0px' });
+    vio.observe(v);
+  });
+  const bio = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); bio.unobserve(e.target); } }), { threshold: .15 });
+  document.querySelectorAll('.m-band').forEach(b => bio.observe(b));
+})();

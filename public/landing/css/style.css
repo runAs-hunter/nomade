@@ -203,3 +203,34 @@ input:focus,select:focus{outline:none;border-color:var(--graphite);box-shadow:0 
 /* citron accent tuning */
 .v-head{color:var(--acc-d)}.v-photo{background:linear-gradient(#d4d6a8,#bfc28a)}.visa{box-shadow:0 0 0 1px rgba(78,80,16,.18),0 1px 2px rgba(0,0,0,.18),0 8px 20px -8px rgba(0,0,0,.25)}
 .seq-bar i{background:var(--graphite)}.seq-bar{height:3px;background:var(--acc-soft)}
+/* ===== Italy media (task/landing-italy-media) ===== */
+/* intro: natura-style aperture that zooms into the hero passport */
+.intro{position:fixed;inset:0;z-index:200;pointer-events:none}
+.has-intro .intro{display:block}
+.intro-veil{position:absolute;inset:0;background:var(--graphite);--r:0px;--cx:50%;--cy:50%;
+-webkit-mask:radial-gradient(circle at var(--cx) var(--cy),transparent var(--r),#000 calc(var(--r) + 1px));mask:radial-gradient(circle at var(--cx) var(--cy),transparent var(--r),#000 calc(var(--r) + 1px))}
+.intro-mark{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;color:var(--bone)}
+.intro-skip{position:absolute;right:var(--pad);bottom:24px;pointer-events:auto;background:none;border:1px solid rgba(234,231,225,.4);color:var(--bone);padding:8px 12px;border-radius:2px}
+.intro-skip:hover{background:var(--acc);border-color:var(--acc);color:var(--graphite)}
+html:not(.has-intro) .intro{display:none!important}
+/* figures */
+.m-band,.vmask,.m-card{margin:0;position:relative;overflow:hidden}
+.m-band picture,.m-card picture{display:block;height:100%}
+.m-band img,.m-card img{display:block;width:100%;height:100%;object-fit:cover}
+.m-band{height:clamp(320px,72vh,760px);border-bottom:var(--rule);background:var(--concrete)}
+.m-band-foot{height:clamp(240px,46vh,520px);border-bottom:0}
+.m-band figcaption,.m-card figcaption,.vmask figcaption{position:absolute;left:var(--pad);bottom:18px;color:var(--bone);text-shadow:0 1px 8px rgba(0,0,0,.45)}
+.m-band img{transform:scale(1.08);transition:transform 1.6s var(--ease)}.m-band.in img{transform:none}
+/* ITALIA mask */
+.vmask{aspect-ratio:4/1;padding-bottom:40px;box-sizing:content-box;border-bottom:var(--rule);background:var(--bone)}
+.vm-video{position:absolute;inset:0 0 40px;width:100%;height:calc(100% - 40px);object-fit:cover;object-position:50% 80%}
+.vm-cut{position:absolute;inset:0 0 40px;width:100%;height:calc(100% - 40px)}
+.vm-cut text{font:800 270px/1 var(--sans);letter-spacing:-.04em}
+.vm-word{position:absolute;inset:0}
+.vmask figcaption{color:var(--graphite);text-shadow:none;bottom:12px}
+/* triptych */
+.m-tri{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(17,17,17,.16);border-bottom:var(--rule)}
+.m-card{aspect-ratio:4/5;background:var(--concrete)}
+.m-card img{transition:transform 1.2s var(--ease)}.m-card:hover img{transform:scale(1.04)}
+@media (max-width:700px){.m-tri{grid-template-columns:1fr}.m-card{aspect-ratio:4/3}}
+@media (prefers-reduced-motion:reduce){.m-band img,.m-card img{transform:none!important;transition:none}}
