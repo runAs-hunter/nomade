@@ -4,6 +4,8 @@
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
+import { stepRequiresEntitlement } from "@/lib/billing/catalog";
+import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
 import {
   computeProgress,
   getStepDef,
@@ -45,6 +47,7 @@ export type PatchStepResult =
         | "UNKNOWN_STEP"
         | "BAD_STATUS"
         | "UNKNOWN_PATH"
+        | "ENTITLEMENT_REQUIRED"
         | "DB_ERROR";
       message: string;
     };
@@ -107,12 +110,26 @@ export async function patchStepStatus(
   }
 
   const pathId = caseRes.case.pathId as JourneyPathId;
-  if (!getStepDef(pathId, args.stepId)) {
+  const stepDef = getStepDef(pathId, args.stepId);
+  if (!stepDef) {
     return {
       ok: false,
       code: "UNKNOWN_STEP",
       message: "Unknown journey step",
     };
+  }
+
+  // F10: Apply + After arrival writes need journey_full (keyed by phase id).
+  if (stepRequiresEntitlement(stepDef.phaseId)) {
+    const ent = await hasActiveJourneyFull(service, args.userId);
+    if (!ent.ok) return { ok: false, code: "DB_ERROR", message: ent.message };
+    if (!ent.active) {
+      return {
+        ok: false,
+        code: "ENTITLEMENT_REQUIRED",
+        message: "Journey unlock required to update this step",
+      };
+    }
   }
 
   const db = service.schema("internal");

@@ -4,6 +4,8 @@
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
+import { phaseAccess, type PhaseAccess } from "@/lib/billing/catalog";
+import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
 import {
   JOURNEY_CATALOG_VERSION,
   JOURNEY_DISCLAIMER,
@@ -42,10 +44,13 @@ export type ChecklistStepView = {
   updatedAt: string;
   /** F9: national/questura official sources for this step (active only). */
   sources: ChecklistSourceView[];
+  /** F10: phase-depth gate. Paid + no entitlement → locked (detail ""). */
+  access: PhaseAccess;
 };
 
 export type ChecklistPhaseView = {
   name: string;
+  access: PhaseAccess;
   steps: ChecklistStepView[];
 };
 
@@ -66,6 +71,12 @@ export type ChecklistView = {
   consulateSources: Record<string, ChecklistSourceView[]>;
   /** F9: max(updated_at) of returned source rows, for client cache-busting. */
   sourcesVersion: string | null;
+  /** F10: server entitlement state (the client never decides "paid"). */
+  entitlement: ChecklistEntitlement;
+};
+
+export type ChecklistEntitlement = {
+  journeyFull: boolean;
 };
 
 export type GetChecklistResult =
@@ -103,24 +114,34 @@ export function buildChecklistView(args: {
   pathId: JourneyPathId;
   states: StepStateRow[];
   sources?: ChecklistSourceIndex;
+  /** F10: active journey_full. Default false (locked preview). */
+  journeyFull?: boolean;
 }): ChecklistView {
   const sources = args.sources ?? EMPTY_SOURCE_INDEX;
+  const journeyFull = args.journeyFull ?? false;
   const stateById = new Map(args.states.map((s) => [s.step_id, s]));
   const fallbackUpdatedAt = args.journeyCase.updatedAt;
-  const phases = getPhasesForPath(args.pathId).map((phase) => ({
+  const phases = getPhasesForPath(args.pathId).map((phase) => {
+    const access = phaseAccess(phase.id);
+    const locked = access === "paid" && !journeyFull;
+    return {
     name: phase.name,
+    access,
     steps: phase.steps.map((step) => {
       const row = stateById.get(step.id);
       return {
         id: step.id,
         name: step.name,
-        detail: step.detail,
+        // F10 default: locked steps show title + sources only, no detail.
+        detail: locked ? "" : step.detail,
         status: row?.status ?? ("not_started" as JourneyStepStatus),
         updatedAt: row?.updated_at ?? fallbackUpdatedAt,
         sources: [...(sources.byStep.get(step.id) ?? [])],
+        access,
       };
     }),
-  }));
+    };
+  });
 
   const statuses = phases.flatMap((p) => p.steps.map((s) => s.status));
   return {
@@ -132,6 +153,7 @@ export function buildChecklistView(args: {
     disclaimer: JOURNEY_DISCLAIMER,
     consulateSources: sources.consulateSources,
     sourcesVersion: sources.sourcesVersion,
+    entitlement: { journeyFull },
   };
 }
 
@@ -182,6 +204,9 @@ export async function getChecklist(
     });
   }
 
+  const ent = await hasActiveJourneyFull(service, userId);
+  if (!ent.ok) return { ok: false, code: "DB_ERROR", message: ent.message };
+
   // F9: sources never fail the checklist — log and return empty sources.
   let sources = EMPTY_SOURCE_INDEX;
   const sourceRows = await loadChecklistSourceRows(service, caseRes.case.pathId);
@@ -198,6 +223,7 @@ export async function getChecklist(
       pathId: caseRes.case.pathId,
       states: rows,
       sources,
+      journeyFull: ent.active,
     }),
   };
 }

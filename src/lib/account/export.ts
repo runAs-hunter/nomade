@@ -1,12 +1,13 @@
 /**
  * F2.6 / F3 account export — build user-scoped JSON envelope.
  * See docs/runbooks/F2.6-account-deletion-export-runbook.md;
- * F3 fills `journey` (docs/runbooks/F3-journey-checklist-runbook.md).
+ * F3 fills `journey`; F3.1 fills `billing` (docs/runbooks/F3.1-billing-entitlement-runbook.md).
  *
  * providerSubject may appear in the export file (user-owned). Never log it.
  */
 
 import type { DeletionStatus } from "@/lib/account/bootstrap";
+import { loadBillingForExport } from "@/lib/billing/entitlements";
 
 export type ExportAccount = {
   createdAt: string;
@@ -38,6 +39,28 @@ export type ExportJourneyCase = {
   steps: ExportJourneyStep[];
 };
 
+export type ExportBillingEntitlement = {
+  id: string;
+  status: string;
+  grantedAt: string;
+  updatedAt: string;
+  sourceTransactionId: string | null;
+};
+
+export type ExportBillingEvent = {
+  transactionId: string;
+  originalTransactionId: string | null;
+  productId: string;
+  eventType: string;
+  occurredAt: string;
+};
+
+/** Entitlement + transaction ids only — never JWS / raw_ref (F3.1 / Class E). */
+export type ExportBilling = {
+  entitlements: ExportBillingEntitlement[];
+  events: ExportBillingEvent[];
+};
+
 export type AccountExportEnvelope = {
   exportedAt: string;
   userId: string;
@@ -46,7 +69,7 @@ export type AccountExportEnvelope = {
   identities: ExportIdentity[];
   journey: ExportJourneyCase[];
   chat: [];
-  billing: [];
+  billing: ExportBilling;
   notes: string[];
 };
 
@@ -79,7 +102,7 @@ export type BuildExportResult =
     };
 
 const EXPORT_NOTES = [
-  "journey array filled when a case exists (F3); chat/billing empty until those domains ship",
+  "journey filled when a case exists (F3); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
 ];
 
 /**
@@ -90,10 +113,15 @@ export function buildExportEnvelope(args: {
   user: ExportUserRow;
   identities: ExportIdentityRow[];
   journey?: ExportJourneyCase[];
+  billing?: ExportBilling;
   exportedAt?: string;
 }): AccountExportEnvelope {
   const { user, identities } = args;
   const journey = args.journey ?? [];
+  const billing: ExportBilling = args.billing ?? {
+    entitlements: [],
+    events: [],
+  };
   const email =
     typeof user.email === "string" && user.email.trim().length > 0
       ? user.email.trim()
@@ -121,7 +149,7 @@ export function buildExportEnvelope(args: {
     })),
     journey,
     chat: [],
-    billing: [],
+    billing,
     notes: [...EXPORT_NOTES],
   };
 }
@@ -253,12 +281,27 @@ export async function loadAccountExport(
     return { ok: false, code: "DB_ERROR", message: journeyRes.message };
   }
 
+  const billingRes = await loadBillingForExport(service, userId);
+  if (!billingRes.ok) {
+    return { ok: false, code: "DB_ERROR", message: billingRes.message };
+  }
+
   return {
     ok: true,
     envelope: buildExportEnvelope({
       user,
       identities,
       journey: journeyRes.journey,
+      billing: {
+        entitlements: billingRes.entitlements.map((e) => ({
+          id: e.id,
+          status: e.status,
+          grantedAt: e.grantedAt,
+          updatedAt: e.updatedAt,
+          sourceTransactionId: e.sourceTransactionId,
+        })),
+        events: billingRes.events,
+      },
       exportedAt,
     }),
   };

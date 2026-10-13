@@ -4,7 +4,7 @@
  *
  * Auth admin deleteUser lives here only (never soft-delete). No Apple revoke.
  * F3: wipeJourney deletes journey_cases (step_states cascade).
- * Chat/billing wipe stubs remain no-ops until those tables exist.
+ * Chat wipe stub remains; F3.1 wipeBilling deletes entitlements and strips event raw_ref.
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
@@ -102,10 +102,35 @@ export async function wipeChat(userId: string): Promise<WipeResult> {
   return { wiped: 0 };
 }
 
-/** Billing wipe stub — no-op until F3.1 retention tables exist. */
-export async function wipeBilling(userId: string): Promise<WipeResult> {
-  void userId;
-  return { wiped: 0 };
+/**
+ * F3.1 billing wipe (Class E):
+ * - DELETE derived entitlements for the user
+ * - Retain append-only billing_events; strip raw_ref (no JWS residue)
+ * Returns wiped entitlement row count.
+ */
+export async function wipeBilling(
+  service: AccountDbClient,
+  userId: string,
+): Promise<WipeResult> {
+  const db = service.schema("internal");
+
+  const del = await db
+    .from("entitlements")
+    .delete()
+    .eq("user_id", userId)
+    .select("entitlement_id");
+
+  // Best-effort strip of opaque refs on retained events
+  await db
+    .from("billing_events")
+    .update({ raw_ref: null })
+    .eq("user_id", userId);
+
+  if (del.error) {
+    return { wiped: 0 };
+  }
+  const rows = (del.data as { entitlement_id: string }[] | null) ?? [];
+  return { wiped: rows.length };
 }
 
 /** True when Auth admin reports the user is already gone (idempotent success). */
@@ -238,10 +263,10 @@ export async function purgeAccount(
     return { userId, outcome: "failed", failCode: "DELETE_IDENTITIES" };
   }
 
-  // 3. Domain wipes — journey real (F3); chat/billing stubs
+  // 3. Domain wipes — journey (F3); billing (F3.1); chat stub
   await wipeJourney(service, userId);
   await wipeChat(userId);
-  await wipeBilling(userId);
+  await wipeBilling(service, userId);
 
   // 4. Auth admin deleteUser — missing user = success
   let authAlreadyGone = false;

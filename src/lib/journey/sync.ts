@@ -5,6 +5,8 @@
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
+import { stepRequiresEntitlement } from "@/lib/billing/catalog";
+import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
 import {
   getStepDef,
   isJourneyStepStatus,
@@ -149,11 +151,20 @@ async function applyOneMutation(
     nowIso: string;
     /** In-memory map of step_id → current side (mutated as we go). */
     live: Map<string, MergeSide>;
+    /** F10: lazily resolved journey_full (only read when a paid step is hit). */
+    journeyFull: () => Promise<boolean | null>;
   },
 ): Promise<"applied" | SyncRejected> {
   const { mutation, pathId, caseId, nowIso, live } = args;
-  if (!getStepDef(pathId, mutation.stepId)) {
+  const stepDef = getStepDef(pathId, mutation.stepId);
+  if (!stepDef) {
     return { opId: mutation.opId, code: "UNKNOWN_STEP" };
+  }
+  // F10: sync must not bypass the PATCH gate.
+  if (stepRequiresEntitlement(stepDef.phaseId)) {
+    const full = await args.journeyFull();
+    if (full === null) return { opId: mutation.opId, code: "DB_ERROR" };
+    if (!full) return { opId: mutation.opId, code: "ENTITLEMENT_REQUIRED" };
   }
 
   const serverSide: MergeSide = live.get(mutation.stepId) ?? {
@@ -312,6 +323,12 @@ export async function syncJourney(
   const appliedOpIds: string[] = [];
   let wrote = false;
 
+  let journeyFullMemo: Promise<boolean | null> | null = null;
+  const journeyFull = () =>
+    (journeyFullMemo ??= hasActiveJourneyFull(service, args.userId).then((r) =>
+      r.ok ? r.active : null,
+    ));
+
   for (const mutation of args.mutations) {
     const result = await applyOneMutation(service, {
       caseId: journeyCase.caseId,
@@ -319,6 +336,7 @@ export async function syncJourney(
       mutation,
       nowIso,
       live,
+      journeyFull,
     });
     if (result === "applied") {
       appliedOpIds.push(mutation.opId);

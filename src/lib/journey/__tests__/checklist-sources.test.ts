@@ -56,6 +56,7 @@ function view(pathId: JourneyPathId, input = rows) {
     journeyCase,
     pathId,
     states: [],
+    journeyFull: true,
     sources: indexChecklistSources(input, pathId),
   });
 }
@@ -154,7 +155,7 @@ describe("F9 buildChecklistView sources join", () => {
 
   it("copy, catalogVersion, disclaimer unchanged; no sources → empty", () => {
     const v = view("italy_digital_nomad");
-    const bare = buildChecklistView({ journeyCase, pathId: "italy_digital_nomad", states: [] });
+    const bare = buildChecklistView({ journeyCase, pathId: "italy_digital_nomad", states: [], journeyFull: true });
     const strip = (x: typeof v) => x.phases.map((p) => ({ name: p.name, steps: p.steps.map(({ id, name, detail }) => ({ id, name, detail })) }));
     expect(strip(v)).toEqual(strip(bare));
     expect(strip(bare)).toEqual(getPhasesForPath("italy_digital_nomad").map((p) => ({ name: p.name, steps: p.steps.map(({ id, name, detail }) => ({ id, name, detail })) })));

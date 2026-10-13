@@ -97,3 +97,11 @@ Runbook: F9 "Checklist cites official sources". Additive fields; older clients i
 - Stale/retired rows are hidden. A step with no row gets `sources: []` (client shows "Official source not yet linked for this step").
 - If the sources read fails, the checklist is still returned (200) with empty `sources` and a `warn` log.
 - **A source change must never change step copy.** `name`/`detail`, `catalogVersion`, and `disclaimer` are independent of sources.
+
+
+## F10 — Billing gate
+
+- Phases carry stable ids (`gather` / `apply` / `after`) in `catalog.ts`; display names (`Gather documents` / `Apply` / `After arrival`) may change without touching the gate.
+- Free: path select, case create, all of **Gather documents**. Paid: **Apply** + **After arrival** status writes (PATCH → `403 ENTITLEMENT_REQUIRED`; sync ops → rejected `ENTITLEMENT_REQUIRED`).
+- Checklist GET: `access` per phase/step + `entitlement.journeyFull`. Locked steps return title + `sources`, `detail: ""`. Disclaimer unchanged.
+- Export/purge include billing — see [`billing.md`](./billing.md).

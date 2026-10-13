@@ -42,6 +42,16 @@ export const serverEnvSchema = z
     APPLE_KEY_ID: z.string().trim().min(1).optional(),
     APPLE_PRIVATE_KEY: z.string().trim().min(1).optional(),
     APPLE_CLIENT_ID: z.string().trim().min(1).optional(),
+    /**
+     * F10 StoreKit 2 non-consumable product id (ASC → Keeper → Vercel env).
+     * Optional at boot (health works); required at transaction verify.
+     * NEVER invent / hardcode an ASC product id in source.
+     */
+    APP_STORE_JOURNEY_PRODUCT_ID: z.string().trim().min(1).optional(),
+    /** Bundle id expected on verified transactions (default com.izaya.Nomade). */
+    APP_STORE_BUNDLE_ID: z.string().trim().min(1).optional(),
+    /** "true" accepts Sandbox (+ Xcode) transactions. Production Vercel sets true for App Review. */
+    APP_STORE_ALLOW_SANDBOX: z.enum(["true", "false"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (looksLikeServiceRoleJwt(data.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
@@ -111,6 +121,9 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     APPLE_KEY_ID: source.APPLE_KEY_ID || undefined,
     APPLE_PRIVATE_KEY: source.APPLE_PRIVATE_KEY || undefined,
     APPLE_CLIENT_ID: source.APPLE_CLIENT_ID || undefined,
+    APP_STORE_JOURNEY_PRODUCT_ID: source.APP_STORE_JOURNEY_PRODUCT_ID || undefined,
+    APP_STORE_BUNDLE_ID: source.APP_STORE_BUNDLE_ID || undefined,
+    APP_STORE_ALLOW_SANDBOX: source.APP_STORE_ALLOW_SANDBOX || undefined,
   });
 
   if (!result.success) {
@@ -260,4 +273,25 @@ export function secretTokenMatches(token: string | null, secret: string): boolea
   const b = Buffer.from(secret);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+export type AppStoreBillingEnv = {
+  /** ASC product id from Keeper/env. Empty → MISCONFIGURED at verify time. */
+  journeyProductId: string;
+  bundleId: string;
+  /** Accept Sandbox / Xcode environments (App Review buys in Sandbox). */
+  allowSandbox: boolean;
+};
+
+const DEFAULT_APP_STORE_BUNDLE_ID = "com.izaya.Nomade";
+
+/** F10 App Store billing config (read at request time). */
+export function getAppStoreBillingConfig(
+  source: EnvSource = process.env,
+): AppStoreBillingEnv {
+  return {
+    journeyProductId: optionalTrimmed(source.APP_STORE_JOURNEY_PRODUCT_ID) ?? "",
+    bundleId: optionalTrimmed(source.APP_STORE_BUNDLE_ID) ?? DEFAULT_APP_STORE_BUNDLE_ID,
+    allowSandbox: optionalTrimmed(source.APP_STORE_ALLOW_SANDBOX) === "true",
+  };
 }

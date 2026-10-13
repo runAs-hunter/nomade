@@ -57,9 +57,9 @@ describe("buildExportEnvelope", () => {
       ],
       journey: [],
       chat: [],
-      billing: [],
+      billing: { entitlements: [], events: [] },
       notes: [
-        "journey array filled when a case exists (F3); chat/billing empty until those domains ship",
+        "journey filled when a case exists (F3); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
       ],
     });
   });
@@ -108,6 +108,8 @@ function makeExportService(state: {
             if (table === "auth_identities") return state.identities;
             if (table === "journey_cases") return journeyCases;
             if (table === "journey_step_states") return journeySteps;
+            if (table === "entitlements") return [];
+            if (table === "billing_events") return [];
             return [];
           };
           api.select = () => self;
@@ -204,7 +206,7 @@ describe("loadAccountExport", () => {
     expect(res.envelope.identities[0].providerSubject).toBe("apple.sub.001");
     expect(res.envelope.journey).toEqual([]);
     expect(res.envelope.chat).toEqual([]);
-    expect(res.envelope.billing).toEqual([]);
+    expect(res.envelope.billing).toEqual({ entitlements: [], events: [] });
     // IDOR: other user's identity must not appear
     expect(
       res.envelope.identities.some((i) => i.providerSubject === "other.sub"),
