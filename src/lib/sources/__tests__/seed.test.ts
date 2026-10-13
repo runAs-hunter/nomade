@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { loadSeedRows, renderSeedSql, SEED_IDS } from "../../../../scripts/gen-sources-seed-sql.mjs";
+import { loadSeedRows, renderSeedSql, renderStepIdsSql, SEED_IDS } from "../../../../scripts/gen-sources-seed-sql.mjs";
 import { isValidSourceId, officialUrlProblem, PATH_ID_RE } from "@/lib/sources/validate";
 import { SOURCE_DOC_TYPES } from "@/lib/sources/types";
 
@@ -29,6 +29,11 @@ describe("F8 seed (Visa Ops CSV → migration)", () => {
   it("has exactly the 20 Cap-accepted rows", () => {
     expect(rows).toHaveLength(20);
     expect(Object.keys(SEED_IDS)).toHaveLength(20);
+  });
+
+  it("F9 step_ids migration is byte-identical to the generator output", () => {
+    const f9 = path.join(ROOT, "supabase/migrations/20261013184348_f9_sources_step_ids.sql");
+    expect(readFileSync(f9, "utf8")).toBe(renderStepIdsSql(rows));
   });
 
   it("committed seed migration is byte-identical to the generator output", () => {

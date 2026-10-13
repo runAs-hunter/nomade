@@ -133,3 +133,11 @@ curl -sS -X POST -H "Authorization: Bearer $CRON_SECRET" "https://<host>/api/cro
 ## Out of scope (F8)
 
 Chat cite UX / prompt changes (F9), RAG / embeddings, iOS UI, multi-country seed, `vercel.json` cron, nomade-prod.
+
+## F9 — `step_ids` mapping
+
+- `docs/sources/F8-official-sources-seed.csv` has a `step_ids` column (`|`-separated, like `path_ids`). The CSV stays the source of truth.
+- `node scripts/gen-sources-seed-sql.mjs --step-ids` renders the update-only migration (`supabase/migrations/20261013184348_f9_sources_step_ids.sql`). The F8 seed output is unchanged.
+- Tests check every `step_ids` entry exists in the catalog for at least one of the row's `path_ids`, and that the committed migration matches the generator.
+- `it-maeci-visti-portal` is deliberately unmapped (generic wizard). Consulate `instructionUrl` pages in `consulates.ts` are not sources.
+- The checklist (`GET /api/journey/checklist`) attaches these rows per step — see `journey.md` F9. **Changing a source must not change step copy.**

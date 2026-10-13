@@ -18,6 +18,14 @@ import {
   insertMissingCatalogSteps,
   type JourneyCaseView,
 } from "@/lib/journey/case";
+import {
+  EMPTY_SOURCE_INDEX,
+  indexChecklistSources,
+  loadChecklistSourceRows,
+  type ChecklistSourceIndex,
+  type ChecklistSourceView,
+} from "@/lib/journey/checklist-sources";
+import { log } from "@/lib/log";
 
 export type StepStateRow = {
   step_id: string;
@@ -32,6 +40,8 @@ export type ChecklistStepView = {
   status: JourneyStepStatus;
   /** ISO timestamptz — echo as expectedUpdatedAt on PATCH. Missing rows use case.updatedAt or epoch. */
   updatedAt: string;
+  /** F9: national/questura official sources for this step (active only). */
+  sources: ChecklistSourceView[];
 };
 
 export type ChecklistPhaseView = {
@@ -52,6 +62,10 @@ export type ChecklistView = {
   phases: ChecklistPhaseView[];
   progress: ChecklistProgress;
   disclaimer: string;
+  /** F9: active consulate rows per US post id; the device picks its own post. */
+  consulateSources: Record<string, ChecklistSourceView[]>;
+  /** F9: max(updated_at) of returned source rows, for client cache-busting. */
+  sourcesVersion: string | null;
 };
 
 export type GetChecklistResult =
@@ -88,7 +102,9 @@ export function buildChecklistView(args: {
   journeyCase: JourneyCaseView;
   pathId: JourneyPathId;
   states: StepStateRow[];
+  sources?: ChecklistSourceIndex;
 }): ChecklistView {
+  const sources = args.sources ?? EMPTY_SOURCE_INDEX;
   const stateById = new Map(args.states.map((s) => [s.step_id, s]));
   const fallbackUpdatedAt = args.journeyCase.updatedAt;
   const phases = getPhasesForPath(args.pathId).map((phase) => ({
@@ -101,6 +117,7 @@ export function buildChecklistView(args: {
         detail: step.detail,
         status: row?.status ?? ("not_started" as JourneyStepStatus),
         updatedAt: row?.updated_at ?? fallbackUpdatedAt,
+        sources: [...(sources.byStep.get(step.id) ?? [])],
       };
     }),
   }));
@@ -113,6 +130,8 @@ export function buildChecklistView(args: {
     phases,
     progress: computeProgress(statuses),
     disclaimer: JOURNEY_DISCLAIMER,
+    consulateSources: sources.consulateSources,
+    sourcesVersion: sources.sourcesVersion,
   };
 }
 
@@ -163,12 +182,22 @@ export async function getChecklist(
     });
   }
 
+  // F9: sources never fail the checklist — log and return empty sources.
+  let sources = EMPTY_SOURCE_INDEX;
+  const sourceRows = await loadChecklistSourceRows(service, caseRes.case.pathId);
+  if (sourceRows.ok) {
+    sources = indexChecklistSources(sourceRows.rows, caseRes.case.pathId);
+  } else {
+    log.warn("journey checklist sources unavailable", { pathId: caseRes.case.pathId });
+  }
+
   return {
     ok: true,
     checklist: buildChecklistView({
       journeyCase: caseRes.case,
       pathId: caseRes.case.pathId,
       states: rows,
+      sources,
     }),
   };
 }
