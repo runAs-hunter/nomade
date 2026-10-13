@@ -114,6 +114,13 @@ new MutationObserver(() => { const n = seq.textContent.slice(0, 2); if (!seenSte
   setTimeout(end, 2500); // never block content longer than ~2.5s
 })();
 
+/* Mask word toggle: <figure id="vmask" data-word="VISTO|ITALIA" data-font="slab|geist"> */
+(function maskWord() {
+  const f = document.getElementById('vmask'); if (!f) return;
+  const w = (f.dataset.word || 'VISTO').toUpperCase(), t = f.querySelector('.vm-cut text'), l = f.querySelector('.vm-word');
+  if (t) t.textContent = w; if (l) l.setAttribute('aria-label', w.charAt(0) + w.slice(1).toLowerCase());
+})();
+
 /* Media: lazy video with poster fallback on save-data / slow links / reduced motion */
 (function media() {
   const c = navigator.connection || {};
