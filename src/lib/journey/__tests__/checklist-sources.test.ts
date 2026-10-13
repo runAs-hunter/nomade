@@ -133,7 +133,6 @@ describe("F9 buildChecklistView sources join", () => {
     expect(v.consulateSources.houston[0].stepIds).toContain("consulate-appointment");
     expect(v.consulateSources.washington.map((s) => s.id).sort()).toEqual([
       "us-washington-dnv-checklist-pdf",
-      "us-washington-visa-booking",
       "us-washington-visa-fees",
     ]);
   });

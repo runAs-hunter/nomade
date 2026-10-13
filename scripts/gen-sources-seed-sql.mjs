@@ -3,7 +3,9 @@
  * F8: generate the official-sources seed migration SQL from the Visa Ops CSV.
  *
  *   node scripts/gen-sources-seed-sql.mjs > supabase/migrations/<version>_f8_official_sources_seed.sql
- *   node scripts/gen-sources-seed-sql.mjs --step-ids > supabase/migrations/<version>_f9_sources_step_ids.sql
+ *   node scripts/gen-sources-seed-sql.mjs --step-ids > supabase/migrations/<version>_f9_<name>.sql
+ *     (re-sets step_ids for every F8 + F9 gap row; the latest such migration
+ *     is the current mapping — earlier ones are historical)
  *   node scripts/gen-sources-seed-sql.mjs --f9-gap > supabase/migrations/<version>_f9_sources_gap_rows.sql
  *
  * Input: docs/sources/F8-official-sources-seed.csv (Visa Ops, Cap-accepted 2026-10-08).
@@ -228,5 +230,5 @@ ${updates}
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const rows = loadSeedRows();
   if (process.argv.includes("--f9-gap")) process.stdout.write(renderF9GapSql(rows, loadGapRows()));
-  else process.stdout.write(process.argv.includes("--step-ids") ? renderStepIdsSql(rows) : renderSeedSql(rows));
+  else process.stdout.write(process.argv.includes("--step-ids") ? renderStepIdsSql([...rows, ...loadGapRows()]) : renderSeedSql(rows));
 }

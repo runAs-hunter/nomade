@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { loadGapRows, loadSeedRows, renderF9GapSql, renderSeedSql, SEED_IDS, URL_FIXES } from "../../../../scripts/gen-sources-seed-sql.mjs";
+import { loadGapRows, loadSeedRows, renderF9GapSql, renderStepIdsSql, renderSeedSql, SEED_IDS, URL_FIXES } from "../../../../scripts/gen-sources-seed-sql.mjs";
 import { isValidSourceId, officialUrlProblem, PATH_ID_RE } from "@/lib/sources/validate";
 import { SOURCE_DOC_TYPES } from "@/lib/sources/types";
 
@@ -31,9 +31,20 @@ describe("F8 seed (Visa Ops CSV → migration)", () => {
     expect(Object.keys(SEED_IDS)).toHaveLength(20);
   });
 
-  it("F9 gap migration is byte-identical to the generator output", () => {
-    const f9 = path.join(ROOT, "supabase/migrations/20261013184804_f9_sources_gap_rows.sql");
-    expect(readFileSync(f9, "utf8")).toBe(renderF9GapSql(rows, loadGapRows()));
+  it("F9 gap migration still inserts exactly the gap CSV rows (historical, step_ids superseded)", () => {
+    const f9 = readFileSync(path.join(ROOT, "supabase/migrations/20261013184804_f9_sources_gap_rows.sql"), "utf8");
+    const gen = renderF9GapSql(rows, loadGapRows());
+    const inserts = (sql: string) => sql.slice(0, sql.indexOf("on conflict (id) do nothing;"));
+    expect(inserts(f9)).toBe(inserts(gen));
+  });
+
+  it("latest step_ids migration is byte-identical to the generator output (current mapping)", () => {
+    const latest = path.join(ROOT, "supabase/migrations/20261013190421_f9_unmap_washington_visa_booking.sql");
+    expect(readFileSync(latest, "utf8")).toBe(renderStepIdsSql([...rows, ...loadGapRows()]));
+  });
+
+  it("Washington visa booking is picker-only (no step_ids)", () => {
+    expect(rows.find((r) => r.id === "us-washington-visa-booking")!).toMatchObject({ step_ids: [] });
   });
 
   it("F9 gap rows: 12 rows (14 Cap rows, two URL pairs merged), valid, unique, no MEF row", () => {
