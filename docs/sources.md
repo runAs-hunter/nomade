@@ -133,3 +133,19 @@ curl -sS -X POST -H "Authorization: Bearer $CRON_SECRET" "https://<host>/api/cro
 ## Out of scope (F8)
 
 Chat cite UX / prompt changes (F9), RAG / embeddings, iOS UI, multi-country seed, `vercel.json` cron, nomade-prod.
+
+## F9 — `step_ids` mapping
+
+- `docs/sources/F8-official-sources-seed.csv` has a `step_ids` column (`|`-separated, like `path_ids`). The CSV stays the source of truth.
+- `node scripts/gen-sources-seed-sql.mjs --step-ids` renders an update-only migration that re-sets `step_ids` for every F8 + F9 gap row. The F8 seed output is unchanged.
+- Migration history: `20261013184348_f9_sources_step_ids` (first mapping) was superseded by `20261013184804_f9_sources_gap_rows`, which is superseded by `20261013190421_f9_unmap_washington_visa_booking`. Only the latest one matches the generator; earlier files are kept as applied.
+- `us-washington-visa-booking` has no `step_ids`: it is the same URL as the Washington `instructionUrl` in `consulates.ts`, so it stays in the picker only. `us-washington-consular-network` is cited on every post's `consulate-appointment`.
+- Tests check every `step_ids` entry exists in the catalog for at least one of the row's `path_ids`, and that the committed migration matches the generator.
+- `it-maeci-visti-portal` is deliberately unmapped (generic wizard). Consulate `instructionUrl` pages in `consulates.ts` are not sources.
+- The checklist (`GET /api/journey/checklist`) attaches these rows per step — see `journey.md` F9. **Changing a source must not change step copy.**
+
+### F9 gap rows (Cap add-on, 2026-10-13)
+
+- `docs/sources/F9-sources-gap-rows.csv` (Visa Ops gap CSV with an `id` column) → `--f9-gap` → `supabase/migrations/20261013184804_f9_sources_gap_rows.sql`: inserts 12 rows, applies `URL_FIXES` (Gazzetta Art. 1 + `&art.flagTipoArticolo=0`), and re-sets every `step_ids` from the CSVs.
+- Cap sent 14 rows; two pairs share an `official_url` (decree Art. 3 and Art. 6), and `official_url` is unique, so each pair is one row with merged `step_ids`. The MEF ticket-exemption row is dropped (Visa Ops to confirm).
+- `cover-letter` is intentionally unsourced (empty state).

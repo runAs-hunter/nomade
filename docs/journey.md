@@ -85,3 +85,15 @@ Fresh case create does **not** import local prototype completions — all steps 
 ## Logging
 
 Class C: log `stepId`, `opId`, status codes, progress counts — never full checklist / detail payloads.
+
+## F9 — Checklist sources (`GET /api/journey/checklist`, additive)
+
+Runbook: F9 "Checklist cites official sources". Additive fields; older clients ignore them.
+
+- `phases[].steps[].sources: ChecklistSourceView[]` — national/questura rows from `internal.sources` (`status = active`, `path_ids` contains the case path, `step_ids` contains the step). Plus the cross-post Washington consular-network map (`us-washington-consular-network`) on `consulate-appointment`.
+- `consulateSources: { [postId]: ChecklistSourceView[] }` — active `US-consulate:<postId>` rows for the path, each with `stepIds`. The server never learns the user's post; the device picks its own entry (residence stays device-local).
+- `sourcesVersion: string | null` — max `updated_at` of the returned rows (cache-bust).
+- `ChecklistSourceView = { id, title, publisher, url, host, retrievedAt, docType, stepIds? }`. `host` is the URL hostname with `www.` stripped. `retrievedAt` is the Visa Ops curation date ("Last verified"), never `lastCheckedAt`.
+- Stale/retired rows are hidden. A step with no row gets `sources: []` (client shows "Official source not yet linked for this step").
+- If the sources read fails, the checklist is still returned (200) with empty `sources` and a `warn` log.
+- **A source change must never change step copy.** `name`/`detail`, `catalogVersion`, and `disclaimer` are independent of sources.
