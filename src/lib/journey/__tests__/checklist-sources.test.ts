@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadSeedRows } from "../../../../scripts/gen-sources-seed-sql.mjs";
+import { loadGapRows, loadSeedRows } from "../../../../scripts/gen-sources-seed-sql.mjs";
 import {
   JOURNEY_CATALOG_VERSION,
   JOURNEY_DISCLAIMER,
@@ -27,7 +27,7 @@ type SeedRow = {
   step_ids: string[];
 };
 
-const seed = loadSeedRows() as SeedRow[];
+const seed = [...loadSeedRows(), ...loadGapRows()] as SeedRow[];
 const rows: ChecklistSourceRow[] = seed.map((r) => ({
   id: r.id,
   path_ids: r.path_ids,
@@ -95,10 +95,28 @@ describe("F9 buildChecklistView sources join", () => {
     expect(polizia.url).toBe("https://www.poliziadistato.it/articolo/225");
   });
 
-  it("unmapped steps get [] (codice-fiscale, cover-letter)", () => {
-    const v = view("italy_digital_nomad");
-    expect(step(v, "codice-fiscale").sources).toEqual([]);
-    expect(step(v, "cover-letter").sources).toEqual([]);
+  it("cover-letter stays intentionally unsourced ([])", () => {
+    expect(step(view("italy_digital_nomad"), "cover-letter").sources).toEqual([]);
+    expect(step(view("italy_remote_worker"), "cover-letter").sources).toEqual([]);
+  });
+
+  it("Cap F9 mapping changes", () => {
+    const n = view("italy_digital_nomad");
+    const r = view("italy_remote_worker");
+    const ids = (v: typeof n, id: string) => step(v, id).sources.map((s) => s.id);
+    expect(ids(n, "highly-qualified")).toContain("it-gu-dm-2024-02-29-art1");
+    for (const sid of ["proof-of-income", "health-insurance", "accommodation", "prior-experience", "permesso-soggiorno", "partita-iva"]) {
+      expect(ids(n, sid), sid).not.toContain("it-gu-dm-2024-02-29-art1");
+    }
+    expect(ids(r, "employment-contract")).toEqual(["it-gu-dm-2024-02-29-art3"]);
+    expect(ids(n, "visa-fee")).not.toContain("it-maeci-long-stay-visa-d");
+    expect(ids(n, "visa-fee")).toEqual(["us-los-angeles-consular-tariff-q4-2026"]);
+    expect(ids(n, "anagrafe")).toEqual(expect.arrayContaining(["it-maeci-long-stay-visa-d", "it-interno-prefettura-roma-anagrafe"]));
+    expect(ids(n, "passport")).toEqual(expect.arrayContaining(["it-normattiva-dlgs-286-1998", "it-normattiva-dlgs-286-1998-art4"]));
+    expect(ids(n, "codice-fiscale")).toEqual(["it-ade-codice-fiscale", "it-gu-dm-2024-02-29-art6"]);
+    expect(ids(n, "partita-iva").length).toBe(3);
+    expect(n.consulateSources["new-york"].map((s) => s.id)).toContain("us-new-york-visa-general");
+    expect(n.consulateSources.washington.map((s) => s.id)).toContain("us-washington-visa-fees");
   });
 
   it("consulate-appointment national sources: Prenot@Mi + jurisdiction map (all posts)", () => {
@@ -110,11 +128,13 @@ describe("F9 buildChecklistView sources join", () => {
   it("consulateSources covers all 10 posts with stepIds", () => {
     const v = view("italy_digital_nomad");
     expect(Object.keys(v.consulateSources).sort()).toHaveLength(10);
+    expect(v.consulateSources.houston).toHaveLength(1);
     expect(v.consulateSources.houston[0].host).toBe("conshouston.esteri.it");
     expect(v.consulateSources.houston[0].stepIds).toContain("consulate-appointment");
     expect(v.consulateSources.washington.map((s) => s.id).sort()).toEqual([
       "us-washington-dnv-checklist-pdf",
       "us-washington-visa-booking",
+      "us-washington-visa-fees",
     ]);
   });
 

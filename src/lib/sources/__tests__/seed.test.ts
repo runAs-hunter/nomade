@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { loadSeedRows, renderSeedSql, renderStepIdsSql, SEED_IDS } from "../../../../scripts/gen-sources-seed-sql.mjs";
+import { loadGapRows, loadSeedRows, renderF9GapSql, renderSeedSql, SEED_IDS, URL_FIXES } from "../../../../scripts/gen-sources-seed-sql.mjs";
 import { isValidSourceId, officialUrlProblem, PATH_ID_RE } from "@/lib/sources/validate";
 import { SOURCE_DOC_TYPES } from "@/lib/sources/types";
 
@@ -31,9 +31,26 @@ describe("F8 seed (Visa Ops CSV → migration)", () => {
     expect(Object.keys(SEED_IDS)).toHaveLength(20);
   });
 
-  it("F9 step_ids migration is byte-identical to the generator output", () => {
-    const f9 = path.join(ROOT, "supabase/migrations/20261013184348_f9_sources_step_ids.sql");
-    expect(readFileSync(f9, "utf8")).toBe(renderStepIdsSql(rows));
+  it("F9 gap migration is byte-identical to the generator output", () => {
+    const f9 = path.join(ROOT, "supabase/migrations/20261013184804_f9_sources_gap_rows.sql");
+    expect(readFileSync(f9, "utf8")).toBe(renderF9GapSql(rows, loadGapRows()));
+  });
+
+  it("F9 gap rows: 12 rows (14 Cap rows, two URL pairs merged), valid, unique, no MEF row", () => {
+    const gap = loadGapRows() as (SeedRow & { step_ids: string[] })[];
+    expect(gap).toHaveLength(12);
+    const all = [...rows, ...gap];
+    expect(new Set(all.map((r) => r.id)).size).toBe(all.length);
+    const urls = all.map((r) => (URL_FIXES as Record<string, string>)[r.id] ?? r.official_url);
+    expect(new Set(urls).size).toBe(all.length);
+    for (const r of gap) {
+      expect(officialUrlProblem(r.official_url)).toBeNull();
+      expect(isValidSourceId(r.id)).toBe(true);
+      expect(SOURCE_DOC_TYPES).toContain(r.doc_type);
+      expect(r.official_url).not.toContain("sistemats1.sanita.finanze.it");
+    }
+    for (const u of Object.values(URL_FIXES)) expect(officialUrlProblem(u)).toBeNull();
+    expect((URL_FIXES as Record<string, string>)["it-gu-dm-2024-02-29-art1"]).toMatch(/&art\.flagTipoArticolo=0$/);
   });
 
   it("committed seed migration is byte-identical to the generator output", () => {

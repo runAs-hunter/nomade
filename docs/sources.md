@@ -141,3 +141,9 @@ Chat cite UX / prompt changes (F9), RAG / embeddings, iOS UI, multi-country seed
 - Tests check every `step_ids` entry exists in the catalog for at least one of the row's `path_ids`, and that the committed migration matches the generator.
 - `it-maeci-visti-portal` is deliberately unmapped (generic wizard). Consulate `instructionUrl` pages in `consulates.ts` are not sources.
 - The checklist (`GET /api/journey/checklist`) attaches these rows per step — see `journey.md` F9. **Changing a source must not change step copy.**
+
+### F9 gap rows (Cap add-on, 2026-10-13)
+
+- `docs/sources/F9-sources-gap-rows.csv` (Visa Ops gap CSV with an `id` column) → `--f9-gap` → `supabase/migrations/20261013184804_f9_sources_gap_rows.sql`: inserts 12 rows, applies `URL_FIXES` (Gazzetta Art. 1 + `&art.flagTipoArticolo=0`), and re-sets every `step_ids` from the CSVs.
+- Cap sent 14 rows; two pairs share an `official_url` (decree Art. 3 and Art. 6), and `official_url` is unique, so each pair is one row with merged `step_ids`. The MEF ticket-exemption row is dropped (Visa Ops to confirm).
+- `cover-letter` is intentionally unsourced (empty state).
