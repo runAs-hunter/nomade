@@ -136,7 +136,7 @@ describe("POST /api/account/export", () => {
         ],
         journey: [],
         chat: [],
-        billing: [],
+        billing: { entitlements: [], events: [] },
         notes: [
           "journey/chat/billing arrays empty until those domains ship; format stable for clients",
         ],
@@ -150,7 +150,7 @@ describe("POST /api/account/export", () => {
     expect(body.identities[0].providerSubject).toBe("apple.sub.001");
     expect(body.journey).toEqual([]);
     expect(body.chat).toEqual([]);
-    expect(body.billing).toEqual([]);
+    expect(body.billing).toEqual({ entitlements: [], events: [] });
     expect(res.headers.get("x-request-id")).toBeTruthy();
     expect(loadAccountExport).toHaveBeenCalledWith(
       expect.anything(),
@@ -174,7 +174,7 @@ describe("POST /api/account/export", () => {
         identities: [],
         journey: [],
         chat: [],
-        billing: [],
+        billing: { entitlements: [], events: [] },
         notes: ["journey/chat/billing arrays empty until those domains ship; format stable for clients"],
       },
     });

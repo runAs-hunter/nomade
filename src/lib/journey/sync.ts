@@ -5,6 +5,9 @@
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
+import { stepRequiresEntitlement } from "@/lib/billing/catalog";
+import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
+import { isBillingGateEnabled } from "@/lib/env";
 import {
   getStepDef,
   isJourneyStepStatus,
@@ -149,11 +152,18 @@ async function applyOneMutation(
     nowIso: string;
     /** In-memory map of step_id → current side (mutated as we go). */
     live: Map<string, MergeSide>;
+    /** F10: paid-step writes allowed (gate off, or journey_full active). */
+    paidAllowed: boolean;
   },
 ): Promise<"applied" | SyncRejected> {
   const { mutation, pathId, caseId, nowIso, live } = args;
-  if (!getStepDef(pathId, mutation.stepId)) {
+  const stepDef = getStepDef(pathId, mutation.stepId);
+  if (!stepDef) {
     return { opId: mutation.opId, code: "UNKNOWN_STEP" };
+  }
+  // F10: sync must not bypass the PATCH gate.
+  if (!args.paidAllowed && stepRequiresEntitlement(stepDef.phaseId)) {
+    return { opId: mutation.opId, code: "ENTITLEMENT_REQUIRED" };
   }
 
   const serverSide: MergeSide = live.get(mutation.stepId) ?? {
@@ -312,6 +322,23 @@ export async function syncJourney(
   const appliedOpIds: string[] = [];
   let wrote = false;
 
+  // F10: read the entitlement once, only when the gate is on and a paid step is
+  // touched. A failed read fails the whole sync (5xx), never per-op.
+  let paidAllowed = true;
+  if (
+    isBillingGateEnabled() &&
+    args.mutations.some((m) => {
+      const def = getStepDef(pathId, m.stepId);
+      return def ? stepRequiresEntitlement(def.phaseId) : false;
+    })
+  ) {
+    const ent = await hasActiveJourneyFull(service, args.userId);
+    if (!ent.ok) {
+      return { ok: false, code: "DB_ERROR", message: "Failed to read entitlement" };
+    }
+    paidAllowed = ent.active;
+  }
+
   for (const mutation of args.mutations) {
     const result = await applyOneMutation(service, {
       caseId: journeyCase.caseId,
@@ -319,6 +346,7 @@ export async function syncJourney(
       mutation,
       nowIso,
       live,
+      paidAllowed,
     });
     if (result === "applied") {
       appliedOpIds.push(mutation.opId);

@@ -156,6 +156,14 @@ export async function PATCH(
           status: 404,
         });
       }
+      if (result.code === "ENTITLEMENT_REQUIRED") {
+        return jsonError({
+          code: ERROR_CODES.ENTITLEMENT_REQUIRED,
+          message: result.message,
+          requestId,
+          status: 403,
+        });
+      }
       logger.error("journey step patch failed", {
         code: ERROR_CODES.INTERNAL_ERROR,
         userId: auth.userId,

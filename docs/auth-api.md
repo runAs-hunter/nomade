@@ -1,4 +1,4 @@
-# Auth API (F2.5 / F2.6 / F2.6p / F2.6r / F3 / F4)
+# Auth API (F2.5 / F2.6 / F2.6p / F2.6r / F3 / F4 / F10)
 
 Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.1-identity-session-contract-adr.md`](./adrs/F2.1-identity-session-contract-adr.md). Runbooks: [`runbooks/F2.5-jwt-middleware-polish-runbook.md`](./runbooks/F2.5-jwt-middleware-polish-runbook.md), [`runbooks/F2.6-account-deletion-export-runbook.md`](./runbooks/F2.6-account-deletion-export-runbook.md), [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md), [`runbooks/F2.6r-apple-token-revoke-runbook.md`](./runbooks/F2.6r-apple-token-revoke-runbook.md), [`runbooks/F3-journey-checklist-runbook.md`](./runbooks/F3-journey-checklist-runbook.md), [`runbooks/F4-sync-merge-runbook.md`](./runbooks/F4-sync-merge-runbook.md). Journey overview: [`journey.md`](./journey.md). Bootstrap details: [`identity-bootstrap.md`](./identity-bootstrap.md).
 
@@ -26,6 +26,8 @@ Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.
 | `GET /api/journey/checklist` | Protected (F3) | Bearer via `requireAccess` + active account |
 | `PATCH /api/journey/steps/{stepId}` | Protected (F3/F4) | Bearer via `requireAccess` + active account |
 | `POST /api/journey/sync` | Protected (F4) | Bearer via `requireAccess` + active account |
+| `GET /api/billing/entitlement` | Protected (F10) | Bearer via `requireAccess` + active account |
+| `POST /api/billing/app-store/transactions` | Protected (F10) | Bearer via `requireAccess` + active account |
 | `GET /api/sources`, `GET /api/sources/{id}` | Public (F8) | None — `status = active` rows only |
 | `POST /api/sources`, `PATCH\|DELETE /api/sources/{id}` | Admin (F8) | `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` **or** user JWT listed in `SOURCES_ADMIN_USER_IDS` — see [`sources.md`](./sources.md) |
 | `GET\|POST /api/cron/check-sources` | Internal / manual trigger (F8) | `Authorization: Bearer ${CRON_SECRET}` only. **Not** in `vercel.json` |
@@ -61,7 +63,7 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - **Body:** empty / ignored.
 - **Success 200:** sync JSON envelope — `{ exportedAt, userId, deletionStatus, account, identities, journey, chat, billing, notes }`.
   - `account.email` included only when present on `internal.users`; `identities[].providerSubject` included in the file (**never log** it).
-  - `journey` filled when a case exists (F3); `chat` / `billing` empty until those domains ship.
+  - `journey` filled when a case exists (F3); `billing` = entitlements + transaction ids/environment only, never the JWS or its hash (F10); `chat` empty until that domain ships.
 - **`pending_deletion`:** still **200** (final copy allowed).
 - **`deleted`:** `410 ACCOUNT_DELETED`.
 - **No user row:** `401 UNAUTHENTICATED` “Bootstrap required”.
@@ -86,7 +88,7 @@ Optional IDOR check: `assertSameUser(auth.userId, resourceUserId, requestId)` �
 - **Unauthorized:** `401 UNAUTHENTICATED`. Missing `CRON_SECRET` env → `500 ENV_INVALID`.
 - **Partial failures:** still **200** with `failed > 0`; batch continues.
 - **Eligibility:** `deletion_status = pending_deletion` AND `deleted_at <= now() - 24h`; batch ≤ 50 per run.
-- **Per user:** legal-hold stub (always false) → scrub `email → null` → DELETE `auth_identities` → **F3** `wipeJourney` (delete `journey_cases`, steps cascade) + chat/billing wipe stubs → `auth.admin.deleteUser` (Auth-missing = success) → `deletion_status = deleted` (keep row; leave `deleted_at`).
+- **Per user:** legal-hold stub (always false) → scrub `email → null` → DELETE `auth_identities` → **F3** `wipeJourney` (delete `journey_cases`, steps cascade) + **F10** `wipeBilling` (delete entitlements; strip `raw_ref` from retained events) + chat wipe stub → `auth.admin.deleteUser` (Auth-missing = success) → `deletion_status = deleted` (keep row; leave `deleted_at`).
 - Soft delete does **not** Auth-delete; only this cron does. Apple `/auth/revoke` is **not** called here (F2.6r revokes on soft-delete only). Chat / route / health stay public.
 - Schedule: `vercel.json` cron `0 4 * * *` UTC → `/api/cron/purge-accounts`. Preview may not fire like Production — local/manual curl with Keeper secret is the smoke path.
 - Full runbook: [`runbooks/F2.6p-account-hard-purge-runbook.md`](./runbooks/F2.6p-account-hard-purge-runbook.md).
@@ -130,3 +132,13 @@ All require Bearer `requireAccess` and **active** `internal.users` (`pending_del
 - **409 `MERGE_REQUIRED`:** Case B when `hasLocalDraft` and server journey exists (mirror bootstrap)
 - **404 `NO_JOURNEY_CASE`:** no case and no `pathId` for Case A auto-attach
 - Behavior: monotonic merge per step; replay-safe without `journey_sync_ops` table
+
+
+## Billing (F10)
+
+Details: [`billing.md`](./billing.md). Same Bearer + **active** account gates as journey. **Never gated:** sign-in, account, export, delete, purge, the disclaimer, sources.
+
+- `GET /api/journey/checklist` adds `entitlement: { journeyFull, unavailable? }`, phase `id` (`gather | apply | after`), and `access: "free" | "paid"` per phase and step. The paid gate only applies when `BILLING_GATE_ENABLED=true` (default off). Gather documents = free; Apply + After arrival = paid (gate keys on phase **ids**, not names). Locked paid steps keep `name` + `sources`; `detail` is `""`.
+- `PATCH /api/journey/steps/{stepId}` on a paid step without `journey_full` → **403 `ENTITLEMENT_REQUIRED`**. `POST /api/journey/sync` rejects such ops per op with `ENTITLEMENT_REQUIRED` (no bypass).
+- `GET /api/billing/entitlement` → `{ entitlements: [{ id, status, grantedAt, updatedAt, sourceTransactionId }], requestId }`.
+- `POST /api/billing/app-store/transactions` body `{ signedTransaction, eventType?: "purchase" | "restore" }` → `{ entitlement, eventInserted, requestId }`. 400 on bad/unverified JWS, bundle/product mismatch, or rejected environment; 503 `ENV_INVALID` when `APP_STORE_JOURNEY_PRODUCT_ID` is unset.

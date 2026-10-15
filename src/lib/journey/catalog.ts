@@ -35,14 +35,27 @@ export type JourneyPathDef = {
   available: boolean;
 };
 
+/** Stable phase ids (F10 gate keys). Display names may change; ids may not. */
+export type JourneyPhaseId = "gather" | "apply" | "after";
+export const JOURNEY_PHASE_IDS: readonly JourneyPhaseId[] = ["gather", "apply", "after"];
+
+/** Display names (F5 sentence case). Never gate on these. */
+export const JOURNEY_PHASE_NAMES: Readonly<Record<JourneyPhaseId, string>> = {
+  gather: "Gather documents",
+  apply: "Apply",
+  after: "After arrival",
+};
+
 export type JourneyStepDef = {
   id: string;
   name: string;
   detail: string;
+  phaseId: JourneyPhaseId;
   phaseName: string;
 };
 
 export type JourneyPhaseDef = {
+  id: JourneyPhaseId;
   name: string;
   steps: JourneyStepDef[];
 };
@@ -64,17 +77,17 @@ export const JOURNEY_PATHS: readonly JourneyPathDef[] = [
   },
 ] as const;
 
-const GATHER = "Gather documents";
-const APPLY = "Apply";
-const AFTER = "After arrival";
+const GATHER: JourneyPhaseId = "gather";
+const APPLY: JourneyPhaseId = "apply";
+const AFTER: JourneyPhaseId = "after";
 
 function step(
-  phaseName: string,
+  phaseId: JourneyPhaseId,
   id: string,
   name: string,
   detail: string,
 ): JourneyStepDef {
-  return { id, name, detail, phaseName };
+  return { id, name, detail, phaseId, phaseName: JOURNEY_PHASE_NAMES[phaseId] };
 }
 
 const PASSPORT_DETAIL =
@@ -165,10 +178,11 @@ function afterShared(): JourneyStepDef[] {
 
 /** Nomad phases. Separate array from the remote-worker catalog. */
 const NOMAD_PHASES: JourneyPhaseDef[] = [
-  { name: GATHER, steps: gatherShared(NOMAD_PROOF_OF_INCOME_DETAIL) },
-  { name: APPLY, steps: applySteps() },
+  { id: GATHER, name: JOURNEY_PHASE_NAMES[GATHER], steps: gatherShared(NOMAD_PROOF_OF_INCOME_DETAIL) },
+  { id: APPLY, name: JOURNEY_PHASE_NAMES[APPLY], steps: applySteps() },
   {
-    name: AFTER,
+    id: AFTER,
+    name: JOURNEY_PHASE_NAMES[AFTER],
     steps: [
       ...afterShared(),
       step(AFTER, "partita-iva", "Request a partita IVA", PARTITA_IVA_DETAIL),
@@ -179,7 +193,8 @@ const NOMAD_PHASES: JourneyPhaseDef[] = [
 /** Remote-worker phases. proof-of-income uses only the remote sentence. */
 const REMOTE_PHASES: JourneyPhaseDef[] = [
   {
-    name: GATHER,
+    id: GATHER,
+    name: JOURNEY_PHASE_NAMES[GATHER],
     steps: [
       ...gatherShared(REMOTE_PROOF_OF_INCOME_DETAIL),
       step(
@@ -190,8 +205,8 @@ const REMOTE_PHASES: JourneyPhaseDef[] = [
       ),
     ],
   },
-  { name: APPLY, steps: applySteps() },
-  { name: AFTER, steps: afterShared() },
+  { id: APPLY, name: JOURNEY_PHASE_NAMES[APPLY], steps: applySteps() },
+  { id: AFTER, name: JOURNEY_PHASE_NAMES[AFTER], steps: afterShared() },
 ];
 
 const CATALOG_BY_PATH: Record<JourneyPathId, JourneyPhaseDef[]> = {
@@ -213,6 +228,7 @@ export function isKnownPathId(pathId: string): pathId is JourneyPathId {
 
 export function getPhasesForPath(pathId: JourneyPathId): JourneyPhaseDef[] {
   return CATALOG_BY_PATH[pathId].map((phase) => ({
+    id: phase.id,
     name: phase.name,
     steps: phase.steps.map((s) => ({ ...s })),
   }));

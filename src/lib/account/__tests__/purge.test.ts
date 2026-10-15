@@ -26,9 +26,13 @@ function makePurgeService(state: {
   users: FakeRow[];
   identities: FakeRow[];
   journeyCases?: FakeRow[];
+  entitlements?: FakeRow[];
+  billingEvents?: FakeRow[];
   deleteUser?: ReturnType<typeof vi.fn>;
 }) {
   if (!state.journeyCases) state.journeyCases = [];
+  if (!state.entitlements) state.entitlements = [];
+  if (!state.billingEvents) state.billingEvents = [];
   const deleteUser =
     state.deleteUser ??
     vi.fn(async () => ({ data: { user: null }, error: null }));
@@ -92,7 +96,16 @@ function makePurgeService(state: {
             return self;
           };
           api.maybeSingle = async () => {
-            const rows = table === "users" ? state.users : table === "auth_identities" ? state.identities : (state.journeyCases ?? []);
+            const rows =
+              table === "users"
+                ? state.users
+                : table === "auth_identities"
+                  ? state.identities
+                  : table === "entitlements"
+                    ? (state.entitlements ?? [])
+                    : table === "billing_events"
+                      ? (state.billingEvents ?? [])
+                      : (state.journeyCases ?? []);
             const match = rows.find((r) => matches(r));
             return { data: match ?? null, error: null };
           };
@@ -108,7 +121,16 @@ function makePurgeService(state: {
           api.then = (
             resolve: (v: { data: unknown; error: null }) => unknown,
           ) => {
-            const rows = table === "users" ? state.users : table === "auth_identities" ? state.identities : (state.journeyCases ?? []);
+            const rows =
+              table === "users"
+                ? state.users
+                : table === "auth_identities"
+                  ? state.identities
+                  : table === "entitlements"
+                    ? (state.entitlements ?? [])
+                    : table === "billing_events"
+                      ? (state.billingEvents ?? [])
+                      : (state.journeyCases ?? []);
             if (pendingUpdate) {
               for (const r of rows) {
                 if (matches(r)) Object.assign(r, pendingUpdate);
@@ -134,6 +156,11 @@ function makePurgeService(state: {
                 jc.length = 0;
                 jc.push(...keep);
                 state.journeyCases = jc;
+              } else if (table === "entitlements") {
+                const ents = state.entitlements ?? [];
+                ents.length = 0;
+                ents.push(...keep);
+                state.entitlements = ents;
               }
               pendingDelete = false;
               return Promise.resolve(resolve({ data: removed, error: null }));
@@ -171,7 +198,7 @@ describe("purge constants / stubs", () => {
     expect(isUnderLegalHold(USER_ID)).toBe(false);
   });
 
-  it("chat/billing wipe stubs return wiped:0; journey wipe deletes cases", async () => {
+  it("journey wipe deletes cases; wipeBilling deletes entitlements and strips raw_ref", async () => {
     const state = {
       users: [],
       identities: [],
@@ -179,12 +206,34 @@ describe("purge constants / stubs", () => {
         { id: "case-1", user_id: USER_ID, path_id: "italy_digital_nomad" },
         { id: "case-2", user_id: OTHER_ID, path_id: "italy_digital_nomad" },
       ],
+      entitlements: [
+        {
+          user_id: USER_ID,
+          entitlement_id: "journey_full",
+          status: "active",
+        },
+        {
+          user_id: OTHER_ID,
+          entitlement_id: "journey_full",
+          status: "active",
+        },
+      ],
+      billingEvents: [
+        {
+          user_id: USER_ID,
+          transaction_id: "txn-1",
+          raw_ref: "hash-keep-stripped",
+        },
+      ],
     };
     const service = makePurgeService(state);
     expect(await wipeJourney(service, USER_ID)).toEqual({ wiped: 1 });
     expect(state.journeyCases.map((c) => c.id)).toEqual(["case-2"]);
     expect(await wipeChat(USER_ID)).toEqual({ wiped: 0 });
-    expect(await wipeBilling(USER_ID)).toEqual({ wiped: 0 });
+    expect(await wipeBilling(service, USER_ID)).toEqual({ wiped: 1 });
+    expect(state.entitlements.map((e) => e.user_id)).toEqual([OTHER_ID]);
+    expect(state.billingEvents[0]?.raw_ref).toBeNull();
+    expect(state.billingEvents).toHaveLength(1);
   });
 
   it("eligibility cutoff is now - 24h", () => {
