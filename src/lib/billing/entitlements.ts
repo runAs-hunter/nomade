@@ -108,12 +108,12 @@ export type RecordVerifiedTransactionArgs = {
   originalTransactionId: string | null;
   eventType: BillingEventType;
   occurredAt: string;
-  /** Opaque hash of signed payload — never the raw JWS. */
+  /** SHA-256 of the signed payload — never the raw JWS. */
   rawRef: string | null;
   /** Production | Sandbox | Xcode (already policy-checked). */
   environment?: string | null;
-  /** Apple revocationDate present → entitlement inactive. */
-  revoked?: boolean;
+  /** Apple revocationDate (ISO) when the verified JWS is revoked. */
+  revokedAt?: string | null;
   entitlementId: EntitlementId;
   nowIso?: string;
 };
@@ -126,14 +126,27 @@ export type RecordVerifiedTransactionResult =
     }
   | {
       ok: false;
-      code: "DB_ERROR" | "CONFLICT";
+      code: "DB_ERROR";
       message: string;
     };
 
+const EVENT_COLUMNS =
+  "id, user_id, source, product_id, transaction_id, original_transaction_id, event_type, occurred_at, raw_ref, environment, revoked_at, created_at";
+const ENTITLEMENT_COLUMNS =
+  "user_id, entitlement_id, status, source_transaction_id, granted_at, updated_at";
+
+type EventRow = BillingEventRow & { revoked_at?: string | null };
+
 /**
- * Idempotent upsert: billing_events unique (source, transaction_id);
- * entitlement granted/updated for the mapped entitlement id.
- * Same-user replay is idempotent; cross-user reuse → CONFLICT.
+ * F10 record path:
+ * - billing_events unique (source, transaction_id); a concurrent insert race re-reads.
+ * - Sticky revocation: once `revoked_at` is set for a transaction (by a revoked
+ *   JWS), it is never cleared and the transaction never grants `active` again —
+ *   replaying a saved pre-refund JWS stays inactive.
+ * - On revoke, every entitlement sourced from that transaction is deactivated
+ *   (shared Apple ID across Nomade accounts).
+ * - Same transaction on a second account (not revoked) → granted + logged.
+ * - granted_at is set on first grant only; replays update status/updated_at.
  */
 export async function recordVerifiedTransaction(
   service: AccountDbClient,
@@ -141,24 +154,27 @@ export async function recordVerifiedTransaction(
 ): Promise<RecordVerifiedTransactionResult> {
   const nowIso = args.nowIso ?? new Date().toISOString();
   const db = service.schema("internal");
+  const fail = (message: string): RecordVerifiedTransactionResult => ({
+    ok: false,
+    code: "DB_ERROR",
+    message,
+  });
 
-  const existing = await db
-    .from("billing_events")
-    .select(
-      "id, user_id, source, product_id, transaction_id, original_transaction_id, event_type, occurred_at, raw_ref, created_at",
-    )
-    .eq("source", BILLING_SOURCE_APP_STORE)
-    .eq("transaction_id", args.transactionId)
-    .maybeSingle();
+  const readEvent = () =>
+    db
+      .from("billing_events")
+      .select(EVENT_COLUMNS)
+      .eq("source", BILLING_SOURCE_APP_STORE)
+      .eq("transaction_id", args.transactionId)
+      .maybeSingle();
 
-  if (existing.error) {
-    return { ok: false, code: "DB_ERROR", message: "Failed to read billing event" };
-  }
+  const existing = await readEvent();
+  if (existing.error) return fail("Failed to read billing event");
 
   let eventInserted = false;
-  let existingRow = (existing.data as BillingEventRow | null) ?? null;
+  let eventRow = (existing.data as EventRow | null) ?? null;
 
-  if (!existingRow) {
+  if (!eventRow) {
     const ins = await db.from("billing_events").insert({
       user_id: args.userId,
       source: BILLING_SOURCE_APP_STORE,
@@ -169,154 +185,104 @@ export async function recordVerifiedTransaction(
       occurred_at: args.occurredAt,
       raw_ref: args.rawRef,
       environment: args.environment ?? null,
+      revoked_at: args.revokedAt ?? null,
     });
     if (ins.error) {
-      // Race: unique violation → re-read and bind to existing owner
-      const msg = String(
-        (ins.error as { message?: string; code?: string }).message ?? "",
-      );
-      const code = String(
-        (ins.error as { code?: string }).code ?? "",
-      );
-      if (!/duplicate|unique|23505/i.test(`${msg} ${code}`)) {
-        return {
-          ok: false,
-          code: "DB_ERROR",
-          message: "Failed to insert billing event",
-        };
+      const e = ins.error as { message?: string; code?: string };
+      if (!/duplicate|unique|23505/i.test(`${e.message ?? ""} ${e.code ?? ""}`)) {
+        return fail("Failed to insert billing event");
       }
-      const again = await db
-        .from("billing_events")
-        .select(
-          "id, user_id, source, product_id, transaction_id, original_transaction_id, event_type, occurred_at, raw_ref, created_at",
-        )
-        .eq("source", BILLING_SOURCE_APP_STORE)
-        .eq("transaction_id", args.transactionId)
-        .maybeSingle();
-      if (again.error || !again.data) {
-        return {
-          ok: false,
-          code: "DB_ERROR",
-          message: "Failed to read billing event after conflict",
-        };
-      }
-      existingRow = again.data as BillingEventRow;
+      const again = await readEvent();
+      if (again.error || !again.data) return fail("Failed to read billing event after conflict");
+      eventRow = again.data as EventRow;
     } else {
       eventInserted = true;
     }
   }
 
-  // F10 Cap default: same Apple ID across Nomade accounts is allowed — grant
-  // to the caller and log it (ids only; no JWS, no Apple account data).
-  if (existingRow && existingRow.user_id !== args.userId) {
+  // Sticky: mark the stored event revoked (never cleared).
+  if (args.revokedAt && eventRow && !eventRow.revoked_at) {
+    const upd = await db
+      .from("billing_events")
+      .update({ revoked_at: args.revokedAt })
+      .eq("source", BILLING_SOURCE_APP_STORE)
+      .eq("transaction_id", args.transactionId);
+    if (upd.error) return fail("Failed to record revocation");
+  }
+
+  const revoked = Boolean(args.revokedAt || eventRow?.revoked_at);
+
+  if (revoked) {
+    // Deactivate every account sourced from this transaction.
+    const off = await db
+      .from("entitlements")
+      .update({ status: "inactive", updated_at: nowIso })
+      .eq("source_transaction_id", args.transactionId);
+    if (off.error) return fail("Failed to deactivate entitlements");
+  } else if (eventRow && eventRow.user_id !== args.userId) {
     log.warn("billing transaction shared across accounts", {
       userId: args.userId,
-      firstUserId: existingRow.user_id,
+      firstUserId: eventRow.user_id,
       transactionId: args.transactionId,
       environment: args.environment ?? null,
     });
   }
 
-  const status: "active" | "inactive" = args.revoked ? "inactive" : "active";
-
-  const upsert = await db
+  const current = await db
     .from("entitlements")
-    .upsert(
-      {
-        user_id: args.userId,
-        entitlement_id: args.entitlementId,
-        status,
-        source_transaction_id: args.transactionId,
-        granted_at: nowIso,
-        updated_at: nowIso,
-      },
-      { onConflict: "user_id,entitlement_id" },
-    )
-    .select(
-      "user_id, entitlement_id, status, source_transaction_id, granted_at, updated_at",
-    )
+    .select(ENTITLEMENT_COLUMNS)
+    .eq("user_id", args.userId)
+    .eq("entitlement_id", args.entitlementId)
     .maybeSingle();
+  if (current.error) return fail("Failed to read entitlement");
+  const cur = current.data as EntitlementRow | null;
 
-  if (upsert.error || !upsert.data) {
-    // Some PostgREST clients need separate update-or-insert
-    const current = await db
-      .from("entitlements")
-      .select(
-        "user_id, entitlement_id, status, source_transaction_id, granted_at, updated_at",
-      )
-      .eq("user_id", args.userId)
-      .eq("entitlement_id", args.entitlementId)
-      .maybeSingle();
-
-    if (current.error) {
-      return {
-        ok: false,
-        code: "DB_ERROR",
-        message: "Failed to upsert entitlement",
-      };
-    }
-
-    if (current.data) {
-      const upd = await db
-        .from("entitlements")
-        .update({
-          status,
-          source_transaction_id: args.transactionId,
-          updated_at: nowIso,
-        })
-        .eq("user_id", args.userId)
-        .eq("entitlement_id", args.entitlementId)
-        .select(
-          "user_id, entitlement_id, status, source_transaction_id, granted_at, updated_at",
-        )
-        .maybeSingle();
-      if (upd.error || !upd.data) {
-        return {
-          ok: false,
-          code: "DB_ERROR",
-          message: "Failed to update entitlement",
-        };
-      }
-      return {
-        ok: true,
-        entitlement: toEntitlementView(upd.data as EntitlementRow),
-        eventInserted,
-      };
-    }
-
-    const insEnt = await db
+  if (revoked) {
+    // Never (re)activate. A different, still-valid source keeps its state.
+    if (cur) return { ok: true, entitlement: toEntitlementView(cur), eventInserted };
+    const ins = await db
       .from("entitlements")
       .insert({
         user_id: args.userId,
         entitlement_id: args.entitlementId,
-        status,
+        status: "inactive",
         source_transaction_id: args.transactionId,
         granted_at: nowIso,
         updated_at: nowIso,
       })
-      .select(
-        "user_id, entitlement_id, status, source_transaction_id, granted_at, updated_at",
-      )
+      .select(ENTITLEMENT_COLUMNS)
       .maybeSingle();
-    if (insEnt.error || !insEnt.data) {
-      return {
-        ok: false,
-        code: "DB_ERROR",
-        message: "Failed to insert entitlement",
-      };
-    }
-    return {
-      ok: true,
-      entitlement: toEntitlementView(insEnt.data as EntitlementRow),
-      eventInserted,
-    };
+    if (ins.error || !ins.data) return fail("Failed to insert entitlement");
+    return { ok: true, entitlement: toEntitlementView(ins.data as EntitlementRow), eventInserted };
   }
 
-  return {
-    ok: true,
-    entitlement: toEntitlementView(upsert.data as EntitlementRow),
-    eventInserted,
-  };
+  if (cur) {
+    // Replay / restore: keep granted_at.
+    const upd = await db
+      .from("entitlements")
+      .update({ status: "active", source_transaction_id: args.transactionId, updated_at: nowIso })
+      .eq("user_id", args.userId)
+      .eq("entitlement_id", args.entitlementId)
+      .select(ENTITLEMENT_COLUMNS)
+      .maybeSingle();
+    if (upd.error || !upd.data) return fail("Failed to update entitlement");
+    return { ok: true, entitlement: toEntitlementView(upd.data as EntitlementRow), eventInserted };
+  }
+
+  const ins = await db
+    .from("entitlements")
+    .insert({
+      user_id: args.userId,
+      entitlement_id: args.entitlementId,
+      status: "active",
+      source_transaction_id: args.transactionId,
+      granted_at: nowIso,
+      updated_at: nowIso,
+    })
+    .select(ENTITLEMENT_COLUMNS)
+    .maybeSingle();
+  if (ins.error || !ins.data) return fail("Failed to insert entitlement");
+  return { ok: true, entitlement: toEntitlementView(ins.data as EntitlementRow), eventInserted };
 }
 
 export async function loadBillingForExport(

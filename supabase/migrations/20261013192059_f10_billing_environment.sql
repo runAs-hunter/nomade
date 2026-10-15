@@ -1,4 +1,5 @@
--- F10: tag every App Store billing event with its StoreKit environment.
+-- F10: tag every App Store billing event with its StoreKit environment,
+-- and record sticky revocation (revoked_at is set once and never cleared).
 -- Forward reconcile on top of 20261002130408_billing_entitlements (already on nomade-dev).
 -- Additive only. Apply scope: local + nomade-dev ONLY. NEVER nomade-prod.
 
@@ -23,3 +24,9 @@ comment on column internal.billing_events.environment is
 
 create index if not exists billing_events_environment_idx
   on internal.billing_events (environment);
+
+alter table internal.billing_events
+  add column if not exists revoked_at timestamptz;
+
+comment on column internal.billing_events.revoked_at is
+  'F10: Apple revocationDate (refund/revoke). Sticky: once set, the transaction never grants journey_full again.';

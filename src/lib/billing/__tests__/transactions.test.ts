@@ -11,100 +11,7 @@ const OTHER_USER_ID = "11111111-2222-3333-4444-555555555555";
 const PRODUCT = "asc.sandbox.from.keeper";
 const NOW = "2026-10-02T14:00:00.000Z";
 
-type FakeRow = Record<string, unknown>;
-
-function makeBillingService(state: {
-  events: FakeRow[];
-  entitlements: FakeRow[];
-}) {
-  return {
-    schema: (name: string) => {
-      expect(name).toBe("internal");
-      return {
-        from: (table: string) => {
-          const filters: { col: string; val: unknown }[] = [];
-          let pendingInsert: FakeRow | null = null;
-          let pendingUpdate: FakeRow | null = null;
-          let pendingUpsert: FakeRow | null = null;
-          const api: Record<string, unknown> = {};
-          const self = api;
-          const rows = () =>
-            table === "billing_events" ? state.events : state.entitlements;
-
-          api.select = () => self;
-          api.eq = (col: string, val: unknown) => {
-            filters.push({ col, val });
-            return self;
-          };
-          api.insert = (row: FakeRow) => {
-            pendingInsert = row;
-            return self;
-          };
-          api.update = (patch: FakeRow) => {
-            pendingUpdate = patch;
-            return self;
-          };
-          api.upsert = (row: FakeRow) => {
-            pendingUpsert = row;
-            return self;
-          };
-          api.order = () => self;
-          api.maybeSingle = async () => {
-            if (pendingInsert) {
-              const row = { id: `ev-${rows().length}`, ...pendingInsert };
-              rows().push(row);
-              pendingInsert = null;
-              return { data: row, error: null };
-            }
-            if (pendingUpsert) {
-              const match = rows().find((r) =>
-                filters.every((f) => r[f.col] === f.val),
-              );
-              if (match) Object.assign(match, pendingUpsert);
-              else rows().push({ ...pendingUpsert });
-              const data = match
-                ? { ...match }
-                : { ...rows()[rows().length - 1] };
-              pendingUpsert = null;
-              return { data, error: null };
-            }
-            if (pendingUpdate) {
-              const match = rows().find((r) =>
-                filters.every((f) => r[f.col] === f.val),
-              );
-              if (match) Object.assign(match, pendingUpdate);
-              const data = match ? { ...match } : null;
-              pendingUpdate = null;
-              return { data, error: null };
-            }
-            return {
-              data: rows().find((r) => filters.every((f) => r[f.col] === f.val)) ?? null,
-              error: null,
-            };
-          };
-          api.then = (
-            resolve: (v: { data: unknown; error: null }) => unknown,
-          ) => {
-            if (pendingInsert) {
-              rows().push({ id: `ev-${rows().length}`, ...pendingInsert });
-              pendingInsert = null;
-              return Promise.resolve(resolve({ data: null, error: null }));
-            }
-            return Promise.resolve(
-              resolve({
-                data: rows().filter((r) =>
-                  filters.every((f) => r[f.col] === f.val),
-                ),
-                error: null,
-              }),
-            );
-          };
-          return self;
-        },
-      };
-    },
-  };
-}
+import { makeBillingService, type FakeRow } from "./fake-billing-db";
 
 describe("processAppStoreTransaction", () => {
   it("rejects when product id env is empty (never invent)", async () => {
@@ -291,9 +198,68 @@ describe("processAppStoreTransaction", () => {
     const state = { events: [] as FakeRow[], entitlements: [] as FakeRow[] };
     expect((await run(state, { transactionId: "t1" })).ok).toBe(true);
     expect(state.entitlements[0].status).toBe("active");
-    const r = await run(state, { transactionId: "t1", revoked: true });
+    const r = await run(state, { transactionId: "t1", revoked: true, revokedAtIso: "2026-10-14T00:00:00.000Z" });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.entitlement.status).toBe("inactive");
     expect(state.entitlements[0].status).toBe("inactive");
+    expect(state.events[0].revoked_at).toBe("2026-10-14T00:00:00.000Z");
+  });
+
+  it("F10: revocation is sticky — replaying a saved pre-refund JWS stays inactive", async () => {
+    const state = { events: [] as FakeRow[], entitlements: [] as FakeRow[] };
+    await run(state, { transactionId: "t2" });
+    await run(state, { transactionId: "t2", revoked: true, revokedAtIso: "2026-10-14T00:00:00.000Z" });
+    const replay = await run(state, { transactionId: "t2" });
+    expect(replay.ok).toBe(true);
+    if (replay.ok) expect(replay.entitlement.status).toBe("inactive");
+    expect(state.entitlements[0].status).toBe("inactive");
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0].revoked_at).toBe("2026-10-14T00:00:00.000Z");
+  });
+
+  it("F10: first-seen revoked JWS records event_type refund and never grants", async () => {
+    const state = { events: [] as FakeRow[], entitlements: [] as FakeRow[] };
+    const r = await run(state, { transactionId: "t3", revoked: true, revokedAtIso: "2026-10-14T00:00:00.000Z" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.entitlement.status).toBe("inactive");
+    expect(state.events[0].event_type).toBe("refund");
+  });
+
+  it("F10: revoke deactivates every account sharing the transaction", async () => {
+    const state = { events: [] as FakeRow[], entitlements: [] as FakeRow[] };
+    await run(state, { transactionId: "t4" });
+    await processAppStoreTransaction(makeBillingService(state), {
+      userId: OTHER_USER_ID,
+      body: { signedTransaction: "h.p.s", eventType: "restore" },
+      config: cfg(true),
+      verify: async () => ({ ok: true as const, transaction: verifiedTransactionFixture({ productId: PRODUCT, transactionId: "t4" }) }),
+      nowIso: NOW,
+    });
+    expect(state.entitlements.filter((e) => e.status === "active")).toHaveLength(2);
+    await run(state, { transactionId: "t4", revoked: true, revokedAtIso: "2026-10-14T00:00:00.000Z" });
+    expect(state.entitlements.every((e) => e.status === "inactive")).toBe(true);
+  });
+
+  it("F10: replay keeps granted_at; client refund eventType rejected", async () => {
+    const state = { events: [] as FakeRow[], entitlements: [] as FakeRow[] };
+    await run(state, { transactionId: "t5" });
+    const first = state.entitlements[0].granted_at;
+    await processAppStoreTransaction(makeBillingService(state), {
+      userId: USER_ID,
+      body: { signedTransaction: "h.p.s", eventType: "restore" },
+      config: cfg(true),
+      verify: async () => ({ ok: true as const, transaction: verifiedTransactionFixture({ productId: PRODUCT, transactionId: "t5" }) }),
+      nowIso: "2026-10-20T00:00:00.000Z",
+    });
+    expect(state.entitlements[0].granted_at).toBe(first);
+    expect(state.entitlements[0].updated_at).toBe("2026-10-20T00:00:00.000Z");
+    const bad = await processAppStoreTransaction(makeBillingService(state), {
+      userId: USER_ID,
+      body: { signedTransaction: "h.p.s", eventType: "refund" },
+      config: cfg(true),
+      verify: async () => ({ ok: true as const, transaction: verifiedTransactionFixture({ productId: PRODUCT }) }),
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.code).toBe("BAD_REQUEST");
   });
 });

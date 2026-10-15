@@ -66,3 +66,43 @@ Runbook: F10 "Unpark billing" (2026-10-13). Restarted on `task/F10-billing`; #20
 - **Same Apple ID across Nomade accounts:** allowed; the second account is granted and a `billing transaction shared across accounts` warn is logged (ids only). The event row stays with the first account (unique `(source, transaction_id)`).
 - `raw_ref` = SHA-256 of the JWS; the JWS is never stored or logged. Price ($79) lives in ASC, not code. US-only storefront is an ASC setting.
 - Migrations: `20261002130408_billing_entitlements` is #20's SQL under the version already recorded on nomade-dev (not re-applied).
+
+
+## F10 review fixes (Cap, 2026-10-15)
+
+- **JWS verification** (`verify-jws.ts`), mirroring Apple's SignedDataVerifier: header `alg` must be `ES256`; `x5c` must be `[leaf, intermediate, root]`; the root must be byte-identical (SHA-256 fingerprint) to the embedded Apple Root CA - G3 (itself pinned to `63:34:3A:…:91:79`) and verify with its key — **no subject-name shortcut**; leaf ← intermediate ← root signatures; Apple OIDs `1.2.840.113635.100.6.11.1` (leaf) and `1.2.840.113635.100.6.2.1` (intermediate); leaf not a CA, intermediate + root CAs; every cert inside its validity window; `purchaseDate` required. Real-crypto tests (`verify-jws.crypto.test.ts`) generate throwaway certs with openssl at test time (no keys in git): fake root with the Apple subject, broken chain, expired, wrong alg, missing OID, CA leaf, tampered payload.
+- **Sticky revocation:** `billing_events.revoked_at` (migration `20261013192059`). A revoked JWS sets it once; it is never cleared. Any later post of that transaction (including a saved pre-refund JWS) stays `inactive`. On revoke, **every** entitlement with that `source_transaction_id` is deactivated (shared Apple ID). A first-seen revoked JWS is stored as `event_type = refund` and never grants.
+- **eventType:** clients send `purchase | restore` only; `refund` is derived server-side.
+- `granted_at` is set on first grant only; replays/restores bump `updated_at`.
+- `POST /api/journey/sync`: when the gate is on and a paid step is touched, a failed entitlement read fails the whole sync (500), not per op.
+- Checklist: phases expose `id` (`gather | apply | after`). An entitlement read failure logs a warn and returns `entitlement: { journeyFull: false, unavailable: true }` (never 500), so Gather still loads.
+- Purge logs a failed `raw_ref` strip / entitlement delete.
+
+### Paywall flag `BILLING_GATE_ENABLED` (default OFF)
+
+| Flag | PATCH / sync on Apply + After arrival | Locked `detail` | `access` + `entitlement` in payload |
+|---|---|---|---|
+| unset / `false` | allowed | full detail | yes |
+| `true` | `403 ENTITLEMENT_REQUIRED` / op rejected unless `journey_full` | `""` unless `journey_full` | yes |
+
+### Monitoring: shared transactions (same Apple ID on several Nomade accounts)
+
+Read-only, nomade-dev:
+
+```sql
+select e.source_transaction_id,
+       count(*)                                   as accounts,
+       array_agg(e.user_id order by e.granted_at) as user_ids,
+       bool_or(e.status = 'active')               as any_active,
+       max(b.environment)                         as environment,
+       max(b.revoked_at)                          as revoked_at
+from internal.entitlements e
+left join internal.billing_events b
+  on b.source = 'app_store' and b.transaction_id = e.source_transaction_id
+where e.entitlement_id = 'journey_full'
+group by e.source_transaction_id
+having count(*) > 1
+order by accounts desc;
+```
+
+Also grep logs for `billing transaction shared across accounts`.

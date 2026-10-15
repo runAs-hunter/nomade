@@ -6,6 +6,7 @@
 import type { AccountDbClient } from "@/lib/account/export";
 import { phaseAccess, type PhaseAccess } from "@/lib/billing/catalog";
 import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
+import { isBillingGateEnabled } from "@/lib/env";
 import {
   JOURNEY_CATALOG_VERSION,
   JOURNEY_DISCLAIMER,
@@ -13,6 +14,7 @@ import {
   getPhasesForPath,
   isKnownPathId,
   type JourneyPathId,
+  type JourneyPhaseId,
   type JourneyStepStatus,
 } from "@/lib/journey/catalog";
 import {
@@ -49,6 +51,8 @@ export type ChecklistStepView = {
 };
 
 export type ChecklistPhaseView = {
+  /** F10: stable phase id (gather | apply | after). */
+  id: JourneyPhaseId;
   name: string;
   access: PhaseAccess;
   steps: ChecklistStepView[];
@@ -77,6 +81,8 @@ export type ChecklistView = {
 
 export type ChecklistEntitlement = {
   journeyFull: boolean;
+  /** F10: present (true) when the entitlement read failed; journeyFull is false. */
+  unavailable?: true;
 };
 
 export type GetChecklistResult =
@@ -116,15 +122,21 @@ export function buildChecklistView(args: {
   sources?: ChecklistSourceIndex;
   /** F10: active journey_full. Default false (locked preview). */
   journeyFull?: boolean;
+  /** F10: entitlement read failed (fallback journeyFull=false). */
+  entitlementUnavailable?: boolean;
+  /** F10: BILLING_GATE_ENABLED. Default true for the pure join; getChecklist passes env. */
+  gateEnabled?: boolean;
 }): ChecklistView {
   const sources = args.sources ?? EMPTY_SOURCE_INDEX;
   const journeyFull = args.journeyFull ?? false;
+  const gateEnabled = args.gateEnabled ?? true;
   const stateById = new Map(args.states.map((s) => [s.step_id, s]));
   const fallbackUpdatedAt = args.journeyCase.updatedAt;
   const phases = getPhasesForPath(args.pathId).map((phase) => {
     const access = phaseAccess(phase.id);
-    const locked = access === "paid" && !journeyFull;
+    const locked = gateEnabled && access === "paid" && !journeyFull;
     return {
+    id: phase.id,
     name: phase.name,
     access,
     steps: phase.steps.map((step) => {
@@ -153,7 +165,7 @@ export function buildChecklistView(args: {
     disclaimer: JOURNEY_DISCLAIMER,
     consulateSources: sources.consulateSources,
     sourcesVersion: sources.sourcesVersion,
-    entitlement: { journeyFull },
+    entitlement: args.entitlementUnavailable ? { journeyFull, unavailable: true } : { journeyFull },
   };
 }
 
@@ -204,8 +216,11 @@ export async function getChecklist(
     });
   }
 
+  // F10: an entitlement read failure never fails the checklist (Gather must load).
   const ent = await hasActiveJourneyFull(service, userId);
-  if (!ent.ok) return { ok: false, code: "DB_ERROR", message: ent.message };
+  if (!ent.ok) {
+    log.warn("journey checklist entitlement unavailable", { userId });
+  }
 
   // F9: sources never fail the checklist — log and return empty sources.
   let sources = EMPTY_SOURCE_INDEX;
@@ -223,7 +238,9 @@ export async function getChecklist(
       pathId: caseRes.case.pathId,
       states: rows,
       sources,
-      journeyFull: ent.active,
+      journeyFull: ent.ok ? ent.active : false,
+      entitlementUnavailable: !ent.ok,
+      gateEnabled: isBillingGateEnabled(),
     }),
   };
 }

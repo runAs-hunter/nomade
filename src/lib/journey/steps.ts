@@ -6,6 +6,7 @@
 import type { AccountDbClient } from "@/lib/account/export";
 import { stepRequiresEntitlement } from "@/lib/billing/catalog";
 import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
+import { isBillingGateEnabled } from "@/lib/env";
 import {
   computeProgress,
   getStepDef,
@@ -120,7 +121,7 @@ export async function patchStepStatus(
   }
 
   // F10: Apply + After arrival writes need journey_full (keyed by phase id).
-  if (stepRequiresEntitlement(stepDef.phaseId)) {
+  if (isBillingGateEnabled() && stepRequiresEntitlement(stepDef.phaseId)) {
     const ent = await hasActiveJourneyFull(service, args.userId);
     if (!ent.ok) return { ok: false, code: "DB_ERROR", message: ent.message };
     if (!ent.active) {

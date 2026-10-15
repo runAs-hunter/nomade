@@ -52,6 +52,8 @@ export const serverEnvSchema = z
     APP_STORE_BUNDLE_ID: z.string().trim().min(1).optional(),
     /** "true" accepts Sandbox (+ Xcode) transactions. Production Vercel sets true for App Review. */
     APP_STORE_ALLOW_SANDBOX: z.enum(["true", "false"]).optional(),
+    /** F10 paywall flag. "true" enforces the Apply/After-arrival gate. Default OFF. */
+    BILLING_GATE_ENABLED: z.enum(["true", "false"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (looksLikeServiceRoleJwt(data.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
@@ -124,6 +126,7 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     APP_STORE_JOURNEY_PRODUCT_ID: source.APP_STORE_JOURNEY_PRODUCT_ID || undefined,
     APP_STORE_BUNDLE_ID: source.APP_STORE_BUNDLE_ID || undefined,
     APP_STORE_ALLOW_SANDBOX: source.APP_STORE_ALLOW_SANDBOX || undefined,
+    BILLING_GATE_ENABLED: source.BILLING_GATE_ENABLED || undefined,
   });
 
   if (!result.success) {
@@ -294,4 +297,13 @@ export function getAppStoreBillingConfig(
     bundleId: optionalTrimmed(source.APP_STORE_BUNDLE_ID) ?? DEFAULT_APP_STORE_BUNDLE_ID,
     allowSandbox: optionalTrimmed(source.APP_STORE_ALLOW_SANDBOX) === "true",
   };
+}
+
+/**
+ * F10 paywall flag (default OFF). When off, Apply/After-arrival writes are not
+ * gated and locked details are returned, but `access` + `entitlement` stay in
+ * the checklist payload. Read per request.
+ */
+export function isBillingGateEnabled(source: EnvSource = process.env): boolean {
+  return optionalTrimmed(source.BILLING_GATE_ENABLED) === "true";
 }

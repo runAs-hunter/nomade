@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { parseSyncMutations, syncJourney } from "@/lib/journey/sync";
 import { listStepDefsForPath } from "@/lib/journey/catalog";
 import { patchStepStatus } from "@/lib/journey/steps";
@@ -196,6 +196,7 @@ describe("syncJourney", () => {
   });
 
   it("F10: sync cannot bypass the paid gate (no entitlement → ENTITLEMENT_REQUIRED)", async () => {
+    vi.stubEnv("BILLING_GATE_ENABLED", "true");
     const state = seededState();
     const res = await syncJourney(makeService(state), {
       userId: USER_ID,
@@ -211,6 +212,47 @@ describe("syncJourney", () => {
     expect(res.appliedOpIds).toEqual(["dddddddd-dddd-4ddd-8ddd-dddddddddddd"]);
     expect(res.rejected.map((r) => r.code)).toEqual(["ENTITLEMENT_REQUIRED", "ENTITLEMENT_REQUIRED"]);
     expect(state.steps.find((s) => s.step_id === "visa-fee")?.status).not.toBe("done");
+    vi.unstubAllEnvs();
+  });
+
+  it("F10: gate on + entitlement read failure → whole sync fails (DB_ERROR → 5xx), nothing applied", async () => {
+    vi.stubEnv("BILLING_GATE_ENABLED", "true");
+    const state = seededState();
+    const svc = makeService(state);
+    const failing = {
+      schema: (n: string) => {
+        const inner = svc.schema(n);
+        return {
+          from: (t: string) =>
+            t === "entitlements"
+              ? { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: "boom" } }) }) }) }) }
+              : inner.from(t),
+        };
+      },
+    };
+    const res = await syncJourney(failing as never, {
+      userId: USER_ID,
+      nowIso: LATER,
+      mutations: [
+        { opId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", stepId: "passport", status: "done", clientUpdatedAt: LATER },
+        { opId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", stepId: "visa-fee", status: "done", clientUpdatedAt: LATER },
+      ],
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("DB_ERROR");
+    expect(state.steps.find((s) => s.step_id === "passport")?.status).not.toBe("done");
+    vi.unstubAllEnvs();
+  });
+
+  it("F10: gate off (default) → paid sync ops apply without entitlement", async () => {
+    const state = seededState();
+    const res = await syncJourney(makeService(state), {
+      userId: USER_ID,
+      nowIso: LATER,
+      mutations: [{ opId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", stepId: "visa-fee", status: "done", clientUpdatedAt: LATER }],
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.rejected).toEqual([]);
   });
 
   it("Case B MERGE_REQUIRED when hasLocalDraft and server case", async () => {

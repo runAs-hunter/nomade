@@ -7,7 +7,7 @@
 import type { AccountDbClient } from "@/lib/account/export";
 import {
   entitlementForProductId,
-  isBillingEventType,
+  isClientBillingEventType,
   type BillingEventType,
 } from "@/lib/billing/catalog";
 import {
@@ -41,7 +41,6 @@ export type ProcessTransactionResult =
         | "BUNDLE_MISMATCH"
         | "ENVIRONMENT_REJECTED"
         | "MISCONFIGURED"
-        | "CONFLICT"
         | "DB_ERROR";
       message: string;
     };
@@ -105,11 +104,11 @@ export async function processAppStoreTransaction(
 
   let eventType: BillingEventType = "purchase";
   if (args.body.eventType !== undefined) {
-    if (!isBillingEventType(args.body.eventType)) {
+    if (!isClientBillingEventType(args.body.eventType)) {
       return {
         ok: false,
         code: "BAD_REQUEST",
-        message: "eventType must be purchase | restore | refund",
+        message: "eventType must be purchase | restore",
       };
     }
     eventType = args.body.eventType;
@@ -159,11 +158,12 @@ export async function processAppStoreTransaction(
     productId: txn.productId,
     transactionId: txn.transactionId,
     originalTransactionId: txn.originalTransactionId,
-    eventType,
+    // F10: refund is derived from Apple's revocationDate, never client-supplied.
+    eventType: txn.revoked ? "refund" : eventType,
     occurredAt: txn.purchaseDateIso,
     rawRef: txn.rawRef,
     environment: txn.environment,
-    revoked: txn.revoked,
+    revokedAt: txn.revokedAtIso,
     entitlementId,
     nowIso: args.nowIso,
   });

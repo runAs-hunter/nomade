@@ -48,8 +48,9 @@ export const BILLING_SOURCE_APP_STORE = "app_store" as const;
 
 export type BillingEventType = "purchase" | "restore" | "refund";
 
-export function isBillingEventType(value: unknown): value is BillingEventType {
-  return (
-    value === "purchase" || value === "restore" || value === "refund"
-  );
+/** Event types a client may send. `refund` is derived server-side (revocationDate). */
+export type ClientBillingEventType = "purchase" | "restore";
+
+export function isClientBillingEventType(value: unknown): value is ClientBillingEventType {
+  return value === "purchase" || value === "restore";
 }

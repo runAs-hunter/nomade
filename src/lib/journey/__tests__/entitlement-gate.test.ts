@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { patchStepStatus } from "@/lib/journey/steps";
 import { buildChecklistView } from "@/lib/journey/checklist";
 import { listStepDefsForPath } from "@/lib/journey/catalog";
@@ -121,7 +121,10 @@ function seeded(entitled: boolean) {
   };
 }
 
-describe("F3.1 entitlement gate on PATCH", () => {
+describe("F3.1 entitlement gate on PATCH (BILLING_GATE_ENABLED=true)", () => {
+  beforeEach(() => vi.stubEnv("BILLING_GATE_ENABLED", "true"));
+  afterEach(() => vi.unstubAllEnvs());
+
   it("allows free Gather Documents PATCH without entitlement", async () => {
     const state = seeded(false);
     const service = makeService(state);
@@ -208,5 +211,50 @@ describe("F3.1 entitlement gate on PATCH", () => {
         expect(view.phases.some((p) => p.access === "free")).toBe(true);
       }
     }
+  });
+});
+
+describe("F10 BILLING_GATE_ENABLED off (default)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("paid PATCH succeeds without entitlement when the flag is unset or false", async () => {
+    for (const v of [undefined, "false"]) {
+      if (v === undefined) vi.unstubAllEnvs();
+      else vi.stubEnv("BILLING_GATE_ENABLED", v);
+      const result = await patchStepStatus(makeService(seeded(false)), {
+        userId: USER_ID,
+        stepId: "consulate-appointment",
+        status: "in_progress",
+        nowIso: NOW,
+      });
+      expect(result.ok).toBe(true);
+    }
+  });
+
+  it("flag off: full detail, access + entitlement still present", () => {
+    const view = buildChecklistView({
+      journeyCase: { caseId: CASE_ID, pathId: "italy_digital_nomad", countryCode: "IT", createdAt: NOW, updatedAt: NOW },
+      pathId: "italy_digital_nomad",
+      states: [],
+      journeyFull: false,
+      gateEnabled: false,
+    });
+    expect(view.entitlement).toEqual({ journeyFull: false });
+    expect(view.phases.map((p) => p.id)).toEqual(["gather", "apply", "after"]);
+    expect(view.phases.map((p) => p.access)).toEqual(["free", "paid", "paid"]);
+    expect(view.phases.every((p) => p.steps.every((s) => s.detail.length > 0))).toBe(true);
+  });
+
+  it("entitlement read failure → journeyFull false + unavailable, checklist still built", () => {
+    const view = buildChecklistView({
+      journeyCase: { caseId: CASE_ID, pathId: "italy_digital_nomad", countryCode: "IT", createdAt: NOW, updatedAt: NOW },
+      pathId: "italy_digital_nomad",
+      states: [],
+      journeyFull: false,
+      entitlementUnavailable: true,
+      gateEnabled: true,
+    });
+    expect(view.entitlement).toEqual({ journeyFull: false, unavailable: true });
+    expect(view.phases[0]!.steps.every((s) => s.detail.length > 0)).toBe(true);
   });
 });

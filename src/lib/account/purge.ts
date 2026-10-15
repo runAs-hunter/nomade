@@ -8,6 +8,7 @@
  */
 
 import type { AccountDbClient } from "@/lib/account/export";
+import { log } from "@/lib/log";
 
 /** Max users processed per cron invocation (Open decision #8). */
 export const PURGE_BATCH_SIZE = 50;
@@ -120,13 +121,17 @@ export async function wipeBilling(
     .eq("user_id", userId)
     .select("entitlement_id");
 
-  // Best-effort strip of opaque refs on retained events
-  await db
+  // Best-effort strip of opaque refs on retained events (F10: failures are logged).
+  const strip = await db
     .from("billing_events")
     .update({ raw_ref: null })
     .eq("user_id", userId);
+  if (strip.error) {
+    log.error("purge billing raw_ref strip failed", { userId, code: "DB_ERROR" });
+  }
 
   if (del.error) {
+    log.error("purge billing entitlements delete failed", { userId, code: "DB_ERROR" });
     return { wiped: 0 };
   }
   const rows = (del.data as { entitlement_id: string }[] | null) ?? [];
