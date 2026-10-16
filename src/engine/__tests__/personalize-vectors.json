@@ -55,11 +55,11 @@
             "conditions": [
               {
                 "if": { "traveling_with": "with_partner" },
-                "detail": "Your partner needs their own Permesso."
+                "detail": "The decree lets digital nomads and remote workers bring a spouse and minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare."
               },
               {
                 "if": { "traveling_with": "with_family" },
-                "detail": "Each family member needs their own Permesso."
+                "detail": "The decree lets digital nomads and remote workers bring a spouse and minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare."
               }
             ]
           }
@@ -113,7 +113,7 @@
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_partner" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["partner needs their own Permesso"] }
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["sponsorship starts in Italy at the Questura"] }
         ]
       }
     },
@@ -122,7 +122,7 @@
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_family" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["Each family member needs their own Permesso"] }
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["Ask your consulate and that Questura"] }
         ]
       }
     },

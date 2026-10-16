@@ -123,7 +123,7 @@ phases:
         conditions:
           - if:
               traveling_with: with_partner
-            detail: "Your partner needs their own Permesso di Soggiorno as a family member (familiare al seguito). Your partner must have traveled to Italy on a family reunion visa — apply at the consulate before traveling."
+            detail: "The decree lets digital nomads and remote workers bring a spouse and minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare."
           - if:
               traveling_with: with_family
-            detail: "Each family member (partner + children) needs their own Permesso di Soggiorno. Apply for family reunion visas at the consulate for all family members before traveling."
+            detail: "The decree lets digital nomads and remote workers bring a spouse and minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare."
