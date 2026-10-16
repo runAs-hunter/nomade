@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildChecklistView } from "@/lib/journey/checklist";
 import {
@@ -29,11 +31,32 @@ const FIXTURE: JourneyStepSummaries = {
 };
 
 describe("task card v2: step summary", () => {
-  it("ships empty until Visa Ops writes it, so no step carries a summary key", () => {
-    expect(JOURNEY_STEP_SUMMARIES.all).toEqual({});
+  it("ships the approved Visa Ops summaries byte-exact from step-summaries.md", () => {
+    // Table rows: | `step-id` | path | summary | chars | grounded in |
+    const md = readFileSync(join(__dirname, "fixtures", "step-summaries.md"), "utf8");
+    const rows = [...md.matchAll(/^\| `([a-z-]+)` \| ([^|]+) \| ([^|]+) \| (\d+) \|/gm)].map((m) => ({
+      id: m[1], path: m[2].trim(), text: m[3].trim(), chars: Number(m[4]),
+    }));
+    expect(rows.length).toBe(20);
+    const pathOf: Record<string, JourneyPathId> = { nomad: "italy_digital_nomad", remote: "italy_remote_worker" };
+    for (const r of rows) {
+      expect([...r.text].length, r.id).toBe(r.chars);
+      const paths = r.path.startsWith("both") ? (["italy_digital_nomad", "italy_remote_worker"] as const) : [pathOf[r.path]];
+      expect(paths[0], `${r.id} path ${r.path}`).toBeDefined();
+      for (const p of paths) expect(stepSummaryFor(p, r.id), `${p}/${r.id}`).toBe(r.text);
+    }
+    // Nothing shipped that is not in the file.
+    const shipped = [
+      ...Object.entries(JOURNEY_STEP_SUMMARIES.all),
+      ...Object.values(JOURNEY_STEP_SUMMARIES.byPath ?? {}).flatMap((m) => Object.entries(m ?? {})),
+    ];
+    for (const [id, text] of shipped) expect(rows.some((r) => r.id === id && r.text === text), id).toBe(true);
+    // Every catalog step on both paths has a summary, and the view carries it.
     for (const p of JOURNEY_PATHS) {
-      for (const phase of view(p.pathId as JourneyPathId).phases) {
-        for (const s of phase.steps) expect("summary" in s, `${p.pathId}/${s.id}`).toBe(false);
+      const pathId = p.pathId as JourneyPathId;
+      for (const def of listStepDefsForPath(pathId)) expect(stepSummaryFor(pathId, def.id), `${pathId}/${def.id}`).toBeTruthy();
+      for (const phase of view(pathId).phases) {
+        for (const st of phase.steps) expect(st.summary, `${pathId}/${st.id}`).toBe(stepSummaryFor(pathId, st.id));
       }
     }
   });
