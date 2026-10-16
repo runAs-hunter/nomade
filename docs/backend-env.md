@@ -71,6 +71,6 @@ iOS and browser clients receive **anon/publishable** only. Service role stays on
 | `APP_STORE_JOURNEY_PRODUCT_ID` | For transaction verify | ASC non-consumable id via Keeper (F10) — **never invent in chat/code** |
 | `APP_STORE_BUNDLE_ID` | Optional | Defaults to `com.izaya.Nomade` |
 | `APP_STORE_ALLOW_SANDBOX` | Optional | `true` accepts `Sandbox`/`Xcode` transactions. Set `true` on Preview **and** Production (App Review buys in Sandbox). Every event records `environment`. |
-| `BILLING_GATE_ENABLED` | Optional (default **off**) | `true` enforces the paid gate (PATCH 403 + sync rejects). Off: no gate, full details; checklist still carries `access` + `entitlement`. Turn on only when the iOS paywall ships. |
+| `BILLING_GATE_ENABLED` | Optional (default **off**) | `true` enforces the paid gate (PATCH 403 + sync rejects). Off: no gate, full details; checklist still carries `access` + `entitlement`; `entitlement.gateEnabled` mirrors this flag so clients lock only when it is on. Turn on only when the iOS paywall ships. |
 
 See [`billing.md`](./billing.md). ASSN V2 deferred to F10b.

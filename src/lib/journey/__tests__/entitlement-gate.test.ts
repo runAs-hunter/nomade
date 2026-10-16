@@ -239,7 +239,7 @@ describe("F10 BILLING_GATE_ENABLED off (default)", () => {
       journeyFull: false,
       gateEnabled: false,
     });
-    expect(view.entitlement).toEqual({ journeyFull: false });
+    expect(view.entitlement).toEqual({ journeyFull: false, gateEnabled: false });
     expect(view.phases.map((p) => p.id)).toEqual(["gather", "apply", "after"]);
     expect(view.phases.map((p) => p.access)).toEqual(["free", "paid", "paid"]);
     expect(view.phases.every((p) => p.steps.every((s) => s.detail.length > 0))).toBe(true);
@@ -254,7 +254,39 @@ describe("F10 BILLING_GATE_ENABLED off (default)", () => {
       entitlementUnavailable: true,
       gateEnabled: true,
     });
-    expect(view.entitlement).toEqual({ journeyFull: false, unavailable: true });
+    expect(view.entitlement).toEqual({ journeyFull: false, unavailable: true, gateEnabled: true });
     expect(view.phases[0]!.steps.every((s) => s.detail.length > 0)).toBe(true);
+  });
+});
+
+describe("F10 entitlement.gateEnabled mirrors BILLING_GATE_ENABLED", () => {
+  const base = {
+    journeyCase: { caseId: CASE_ID, pathId: "italy_digital_nomad" as const, countryCode: "IT", createdAt: NOW, updatedAt: NOW },
+    pathId: "italy_digital_nomad" as const,
+    states: [],
+  };
+
+  it("gate on: gateEnabled true, paid detail hidden without entitlement", () => {
+    const view = buildChecklistView({ ...base, journeyFull: false, gateEnabled: true });
+    expect(view.entitlement).toEqual({ journeyFull: false, gateEnabled: true });
+    expect(view.phases.find((p) => p.id === "apply")!.steps.every((s) => s.detail === "")).toBe(true);
+  });
+
+  it("gate on + entitled: gateEnabled true, journeyFull true", () => {
+    const view = buildChecklistView({ ...base, journeyFull: true, gateEnabled: true });
+    expect(view.entitlement).toEqual({ journeyFull: true, gateEnabled: true });
+  });
+
+  it("gate off: gateEnabled false, access still present", () => {
+    const view = buildChecklistView({ ...base, journeyFull: false, gateEnabled: false });
+    expect(view.entitlement.gateEnabled).toBe(false);
+    expect(view.phases.map((p) => p.access)).toEqual(["free", "paid", "paid"]);
+  });
+
+  it("isBillingGateEnabled reads the env flag (default off)", async () => {
+    const { isBillingGateEnabled } = await import("@/lib/env");
+    expect(isBillingGateEnabled({})).toBe(false);
+    expect(isBillingGateEnabled({ BILLING_GATE_ENABLED: "false" })).toBe(false);
+    expect(isBillingGateEnabled({ BILLING_GATE_ENABLED: "true" })).toBe(true);
   });
 });

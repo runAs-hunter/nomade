@@ -80,6 +80,8 @@ Runbook: F10 "Unpark billing" (2026-10-13). Restarted on `task/F10-billing`; #20
 
 ### Paywall flag `BILLING_GATE_ENABLED` (default OFF)
 
+`entitlement.gateEnabled` in the checklist payload mirrors the flag; iOS locks only when it is `true` (missing → false).
+
 | Flag | PATCH / sync on Apply + After arrival | Locked `detail` | `access` + `entitlement` in payload |
 |---|---|---|---|
 | unset / `false` | allowed | full detail | yes |

@@ -83,6 +83,8 @@ export type ChecklistEntitlement = {
   journeyFull: boolean;
   /** F10: present (true) when the entitlement read failed; journeyFull is false. */
   unavailable?: true;
+  /** F10: mirrors BILLING_GATE_ENABLED. Clients lock only when true. */
+  gateEnabled: boolean;
 };
 
 export type GetChecklistResult =
@@ -165,7 +167,9 @@ export function buildChecklistView(args: {
     disclaimer: JOURNEY_DISCLAIMER,
     consulateSources: sources.consulateSources,
     sourcesVersion: sources.sourcesVersion,
-    entitlement: args.entitlementUnavailable ? { journeyFull, unavailable: true } : { journeyFull },
+    entitlement: args.entitlementUnavailable
+      ? { journeyFull, unavailable: true, gateEnabled }
+      : { journeyFull, gateEnabled },
   };
 }
 
