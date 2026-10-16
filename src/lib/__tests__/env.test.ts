@@ -10,6 +10,7 @@ import {
   projectRefFromUrl,
   resetServerEnvCache,
   serverEnvSchema,
+  getAskConfig,
 } from "@/lib/env";
 
 const VALID = {
@@ -235,5 +236,24 @@ describe("Apple SIWA env optional / getAppleSiwaConfig", () => {
   it("normalizeApplePrivateKey leaves real newlines alone", () => {
     const pem = "-----BEGIN PRIVATE KEY-----\nABC\n-----END PRIVATE KEY-----";
     expect(normalizeApplePrivateKey(pem)).toBe(pem);
+  });
+});
+
+describe("F11b getAskConfig", () => {
+  it("defaults: disabled, Sonnet 4.5 with Haiku 4.5 fallback, 3 / 30", () => {
+    expect(getAskConfig({})).toEqual({
+      enabled: false,
+      model: "anthropic/claude-sonnet-4.5",
+      fallbackModels: ["anthropic/claude-haiku-4.5"],
+      freeDaily: 3,
+      paidDaily: 30,
+    });
+  });
+  it("overrides and bad numbers", () => {
+    expect(
+      getAskConfig({ ASK_ENABLED: "true", ASK_MODEL: "anthropic/claude-haiku-4.5", ASK_FREE_DAILY: "5", ASK_PAID_DAILY: "0" }),
+    ).toEqual({ enabled: true, model: "anthropic/claude-haiku-4.5", fallbackModels: [], freeDaily: 5, paidDaily: 30 });
+    expect(getAskConfig({ ASK_ENABLED: "yes", ASK_FALLBACK_MODEL: "none", ASK_FREE_DAILY: "x" }).enabled).toBe(false);
+    expect(getAskConfig({ ASK_FALLBACK_MODEL: "none" }).fallbackModels).toEqual([]);
   });
 });

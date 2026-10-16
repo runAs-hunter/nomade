@@ -44,6 +44,12 @@ export const REDACT_FIELD_DENYLIST = [
   // Chat / profile payload keys — callers must not pass them; strip if they do.
   "messages",
   "content",
+  // F11b Ask — never log question/answer/prompt text.
+  "question",
+  "answer",
+  "prompt",
+  "system",
+  "text",
 ] as const;
 
 const DENYLIST_SET = new Set(
