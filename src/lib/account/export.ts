@@ -7,6 +7,8 @@
  */
 
 import type { DeletionStatus } from "@/lib/account/bootstrap";
+import { isIntakeEnabled } from "@/lib/env";
+import { listStepDefsForPath } from "@/lib/journey/catalog";
 import { loadBillingForExport } from "@/lib/billing/entitlements";
 
 export type ExportAccount = {
@@ -179,6 +181,12 @@ type JourneyStepExportRow = {
   updated_at: string;
 };
 
+const CONDITIONAL_STEP_IDS: ReadonlySet<string> = new Set(
+  (["italy_digital_nomad", "italy_remote_worker"] as const).flatMap((p) =>
+    listStepDefsForPath(p).filter((d) => d.conditional).map((d) => d.id),
+  ),
+);
+
 type JourneyIntakeExportRow = {
   case_id: string;
   answers: Record<string, unknown> | null;
@@ -242,7 +250,11 @@ export async function loadJourneyForExport(
 
   const steps = (stepRes.data as JourneyStepExportRow[] | null) ?? [];
   const byCase = new Map<string, ExportJourneyStep[]>();
+  // F11a: conditional (rule-added) step rows stay out of the export while
+  // INTAKE_ENABLED is off (they are never seeded then; legacy rows are hidden).
+  const intakeOn = isIntakeEnabled();
   for (const s of steps) {
+    if (!intakeOn && CONDITIONAL_STEP_IDS.has(s.step_id)) continue;
     const list = byCase.get(s.case_id) ?? [];
     list.push({
       stepId: s.step_id,

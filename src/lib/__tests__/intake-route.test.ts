@@ -119,12 +119,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("/api/journey/intake (F11a)", () => {
-  it("flag off → 404 INTAKE_DISABLED before auth", async () => {
+  it("flag off: auth checked first (no token → 401), then 404 INTAKE_DISABLED", async () => {
     vi.stubEnv("INTAKE_ENABLED", "false");
-    const res = await GET(req("GET", undefined, ""));
+    verifyAccessToken.mockResolvedValueOnce({ ok: false, reason: "missing" });
+    const anon = await GET(req("GET", undefined, ""));
+    expect(anon.status).toBe(401);
+    const res = await GET(req("GET"));
     expect(res.status).toBe(404);
     expect((await res.json()).error.code).toBe("INTAKE_DISABLED");
-    expect(verifyAccessToken).not.toHaveBeenCalled();
+    expect(tables.journey_intake).toHaveLength(0);
   });
 
   it("no token → 401 UNAUTHENTICATED envelope", async () => {

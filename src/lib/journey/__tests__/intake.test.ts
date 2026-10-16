@@ -63,7 +63,8 @@ describe("F11a intake questions + parsing", () => {
   it("has the 5 questions (fbiCheck dropped) and spouse/children family values", () => {
     expect(INTAKE_KEYS).toEqual(["incomeSource", "incomeThreshold", "housing", "family", "arrivalMonth"]);
     const family = INTAKE_QUESTIONS.find((q) => q.key === "family")!;
-    expect(family.options).toEqual(["solo", "spouse", "spouse_children", "children"]);
+    expect(family.options).toEqual(["solo", "spouse", "spouse_children", "children", "unsure"]);
+    expect(INTAKE_QUESTIONS.find((q) => q.key === "housing")!.options).toContain("unsure");
     expect(INTAKE_RULES_VERSION).toBe("f11-rules-2026-10-16");
   });
 
@@ -80,12 +81,17 @@ describe("F11a intake questions + parsing", () => {
     expect(parseIntakeAnswers({ arrivalMonth: "2026-10" }, NOW).ok).toBe(true);
     expect(parseIntakeAnswers({ arrivalMonth: "2028-10" }, NOW).ok).toBe(true);
     expect(parseIntakeAnswers({ arrivalMonth: "2028-11" }, NOW).ok).toBe(false);
-    expect(parseIntakeAnswers({ arrivalMonth: "2026-09" }, NOW).ok).toBe(false);
+    // Past months stay valid (Cap review): only the format and the +24 limit.
+    expect(parseIntakeAnswers({ arrivalMonth: "2026-09" }, NOW).ok).toBe(true);
+    expect(parseIntakeAnswers({ arrivalMonth: "2020-01" }, NOW).ok).toBe(true);
     expect(parseIntakeAnswers({ arrivalMonth: "2026-13" }, NOW).ok).toBe(false);
     expect(parseIntakeAnswers({ arrivalMonth: null }, NOW).ok).toBe(true);
   });
 
-  it("complete = all 5 keys present (explicit null arrival counts)", () => {
+  it("complete = all 5 keys present; explicit 'Not sure' counts", () => {
+    expect(
+      isIntakeComplete({ incomeSource: "unsure", incomeThreshold: "unsure", housing: "unsure", family: "unsure", arrivalMonth: null }),
+    ).toBe(true);
     expect(isIntakeComplete({ incomeSource: "unsure" })).toBe(false);
     expect(
       isIntakeComplete({ incomeSource: "unsure", incomeThreshold: "yes", housing: "own", family: "solo", arrivalMonth: null }),
@@ -132,7 +138,7 @@ describe("F11a rules matrix", () => {
                 expect(v.disclaimer).toBe("Preliminary guidance — not legal advice");
               }
     }
-    expect(combos).toBe(2 * 6 * 4 * 4 * 5 * 4);
+    expect(combos).toBe(2 * incomes.length * thresholds.length * housings.length * families.length * arrivals.length);
   });
 
   it("freelancer + lease + spouse_children differs from employee + not_yet + solo", () => {
@@ -190,12 +196,11 @@ describe("F11a INTAKE_ENABLED off", () => {
 describe("F11a copy (Visa Ops + Cap overrides)", () => {
   const all = [...Object.values(INTAKE_NOTE_COPY), ...Object.values(INTAKE_FLAG_COPY)];
 
-  it("every note/flag cites ≥1 seeded source, never the inactive Houston docx", () => {
+  it("every note/flag cites ≥1 seeded source", () => {
     for (const c of all) {
       expect(c.sourceIds.length).toBeGreaterThan(0);
       for (const id of c.sourceIds) {
         expect(SEEDED_IDS.has(id), id).toBe(true);
-        expect(id).not.toBe("us-houston-dnv-checklist-2026-docx");
       }
     }
   });
@@ -205,9 +210,10 @@ describe("F11a copy (Visa Ops + Cap overrides)", () => {
   });
 
   it("overrides: housing key + text, likely_needed wording, no FBI copy", () => {
-    expect(INTAKE_NOTE_COPY.housing_needed_before_appointment.text).toContain("lease or deed");
-    expect(INTAKE_NOTE_COPY.housing_needed_before_appointment.text).toContain("whole visa period");
-    expect(INTAKE_NOTE_COPY.likely_needed.text).toContain("generally within 30 days (Agenzia delle Entrate)");
+    expect(INTAKE_NOTE_COPY.housing_needed_before_appointment.text).toBe(
+      "You'll need housing settled before your appointment. US posts generally ask for a lease, rental contract, or deed in your name covering the whole visa period. Several posts, including New York, say a hotel stay or a hospitality offer is not accepted. Secure a registered lease or deed before you book or attend.",
+    );
+    expect(INTAKE_NOTE_COPY.likely_needed.text).toContain("The Agenzia delle Entrate says form AA9/12 is generally filed within 30 days of starting a professional activity.");
     expect(INTAKE_NOTE_COPY.likely_needed.uncertain).toBe(true);
     expect(Object.keys(INTAKE_NOTE_COPY)).not.toContain("fbi_apostille_lead_time");
     expect(Object.keys(INTAKE_NOTE_COPY)).not.toContain("temporary_booking_ok_check_consulate");
@@ -220,7 +226,9 @@ describe("F11a copy (Visa Ops + Cap overrides)", () => {
       expect(migrationSql).toContain(`array_append(step_ids, '${step}')`);
     }
     expect(migrationSql).toContain("'it-normattiva-dlgs-286-1998-art29'");
-    expect(migrationSql).toMatch(/us-houston-dnv-checklist-2026-docx[\s\S]*?'inactive'/);
+    // Follow-up: Visa Ops confirmed the Houston docx URL → active.
+    expect(migrationSql).toMatch(/set status = 'active'[\s\S]*?where id = 'us-houston-dnv-checklist-2026-docx'/);
+    expect(migrationSql).toMatch(/it-normattiva-dlgs-286-1998-art29[\s\S]*?family-documents', 'family-permesso/);
   });
 
   it("cites only ids active for the path when sources are loaded", () => {

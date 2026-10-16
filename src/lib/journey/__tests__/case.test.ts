@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   upsertJourneyCase,
   getJourneyCase,
@@ -119,12 +119,26 @@ describe("upsertJourneyCase", () => {
     expect(res.case.pathId).toBe("italy_digital_nomad");
     expect(res.case.countryCode).toBe("IT");
 
-    const expected = listStepDefsForPath("italy_digital_nomad");
+    // F11a: INTAKE_ENABLED off (default) → conditional family steps not seeded.
+    const expected = listStepDefsForPath("italy_digital_nomad").filter((s) => !s.conditional);
+    expect(state.steps.map((s) => s.step_id)).not.toContain("family-documents");
     expect(state.steps).toHaveLength(expected.length);
     expect(state.steps.every((s) => s.status === "not_started")).toBe(true);
     expect(state.steps.map((s) => s.step_id).sort()).toEqual(
       expected.map((s) => s.id).sort(),
     );
+  });
+
+  it("F11a: seeds conditional family steps only when INTAKE_ENABLED is on", async () => {
+    vi.stubEnv("INTAKE_ENABLED", "true");
+    try {
+      const state = { cases: [] as FakeRow[], steps: [] as FakeRow[] };
+      await upsertJourneyCase(makeJourneyService(state), { userId: USER_ID, pathId: "italy_digital_nomad", nowIso: NOW });
+      expect(state.steps).toHaveLength(listStepDefsForPath("italy_digital_nomad").length);
+      expect(state.steps.map((s) => s.step_id)).toContain("family-documents");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("returns existing case for same path without reseeding", async () => {
@@ -195,7 +209,7 @@ describe("upsertJourneyCase", () => {
     expect(res.case.pathId).toBe("italy_remote_worker");
     expect(state.steps.every((s) => s.status === "not_started")).toBe(true);
     expect(state.steps).toHaveLength(
-      listStepDefsForPath("italy_remote_worker").length,
+      listStepDefsForPath("italy_remote_worker").filter((s) => !s.conditional).length,
     );
   });
 

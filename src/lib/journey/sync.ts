@@ -19,6 +19,7 @@ import {
 } from "@/lib/journey/catalog";
 import {
   getJourneyCase,
+  isStepWritable,
   upsertJourneyCase,
   userHasJourneyCase,
 } from "@/lib/journey/case";
@@ -194,7 +195,7 @@ async function applyOneMutation(
 ): Promise<"applied" | SyncRejected> {
   const { mutation, pathId, caseId, nowIso, live } = args;
   const stepDef = getStepDef(pathId, mutation.stepId);
-  if (!stepDef) {
+  if (!stepDef || !isStepWritable(stepDef)) {
     return { opId: mutation.opId, code: "UNKNOWN_STEP" };
   }
   // F10: sync must not bypass the PATCH gate.

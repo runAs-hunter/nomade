@@ -15,9 +15,9 @@ export const INTAKE_QUESTIONS = [
     options: ["foreign_employee", "freelancer", "business_owner", "mixed", "unsure"],
   },
   { key: "incomeThreshold", options: ["yes", "no", "unsure"] },
-  { key: "housing", options: ["lease", "own", "not_yet"] },
+  { key: "housing", options: ["lease", "own", "not_yet", "unsure"] },
   /** Art. 29 c.1 (a)(b): spouse 18+ and unmarried minor children only (no unmarried partner). */
-  { key: "family", options: ["solo", "spouse", "spouse_children", "children"] },
+  { key: "family", options: ["solo", "spouse", "spouse_children", "children", "unsure"] },
   /** `YYYY-MM`, current month … +24 months, or null. Options are not enumerated. */
   { key: "arrivalMonth", options: [] as string[] },
 ] as const;
@@ -29,8 +29,8 @@ export type IncomeSource = "foreign_employee" | "freelancer" | "business_owner" 
 export type IntakeAnswers = {
   incomeSource?: IncomeSource;
   incomeThreshold?: "yes" | "no" | "unsure";
-  housing?: "lease" | "own" | "not_yet";
-  family?: "solo" | "spouse" | "spouse_children" | "children";
+  housing?: "lease" | "own" | "not_yet" | "unsure";
+  family?: "solo" | "spouse" | "spouse_children" | "children" | "unsure";
   arrivalMonth?: string | null;
 };
 
@@ -54,7 +54,10 @@ export type ParseIntakeResult =
 
 /**
  * Validate a client answers object. Unknown keys or values → error (400 BAD_INTAKE).
- * Absent key = skipped ("Not sure"). `arrivalMonth` must be in [now, now+24].
+ * "Not sure" is stored explicitly (`unsure`, or `arrivalMonth: null`) so a
+ * skipped question still counts toward completion. Absent key = not reached yet.
+ * `arrivalMonth`: `YYYY-MM`, at most +24 months; past months are accepted
+ * (a stored answer must not start failing sync as time passes).
  */
 export function parseIntakeAnswers(raw: unknown, now: Date): ParseIntakeResult {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
@@ -71,7 +74,7 @@ export function parseIntakeAnswers(raw: unknown, now: Date): ParseIntakeResult {
       }
       if (typeof value !== "string") return { ok: false, message: "arrivalMonth must be YYYY-MM or null" };
       const ahead = monthsAhead(value, now);
-      if (ahead === null || ahead < 0 || ahead > ARRIVAL_MONTH_MAX_AHEAD) {
+      if (ahead === null || ahead > ARRIVAL_MONTH_MAX_AHEAD) {
         return { ok: false, message: "arrivalMonth out of range" };
       }
       out[key] = value;
@@ -164,7 +167,7 @@ export function applyIntakeRules(
   }
 
   const family = answers.family;
-  if (family !== undefined && family !== "solo") {
+  if (family !== undefined && family !== "solo" && family !== "unsure") {
     patches.push({ kind: "add", stepId: "family-documents" });
     patches.push({ kind: "add", stepId: "family-permesso" });
     if (family === "spouse_children" || family === "children") {

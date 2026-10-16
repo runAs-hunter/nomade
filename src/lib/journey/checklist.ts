@@ -76,6 +76,11 @@ export type ChecklistIntakeFlag = {
   /** Visa Ops copy (TIMELINE: sub-text; the client renders "Target: <Mon YYYY>"). */
   text: string;
   sourceIds: string[];
+  /**
+   * INCOME_BELOW_THRESHOLD: the user's consulate rows for the step, per US post
+   * id. The client cites `consulateSourceIds[<its post>]` alongside `sourceIds`.
+   */
+  consulateSourceIds?: Record<string, string[]>;
 };
 
 export type ChecklistIntakeSummary = {
@@ -278,7 +283,18 @@ export function buildChecklistView(args: {
       if (p.kind !== "flag" || seen.has(p.code)) continue;
       seen.add(p.code);
       const copy = INTAKE_FLAG_COPY[p.code];
-      view.flags.push({ code: p.code, text: copy.text, sourceIds: cite(copy.sourceIds) });
+      const flag: ChecklistIntakeFlag = { code: p.code, text: copy.text, sourceIds: cite(copy.sourceIds) };
+      if (copy.consulateStepId) {
+        // The device picks its own post (residence stays on device, F9 lock).
+        const step = copy.consulateStepId;
+        const byPost: Record<string, string[]> = {};
+        for (const [post, rows] of Object.entries(sources.consulateSources)) {
+          const ids = rows.filter((r) => (r.stepIds ?? []).includes(step)).map((r) => r.id);
+          if (ids.length > 0) byPost[post] = ids;
+        }
+        flag.consulateSourceIds = byPost;
+      }
+      view.flags.push(flag);
     }
   }
   return view;

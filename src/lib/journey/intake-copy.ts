@@ -12,6 +12,8 @@ export type IntakeCopy = {
   sourceIds: readonly string[];
   /** Visa Ops marked the claim uncertain; clients may soften the styling. */
   uncertain?: true;
+  /** Also cite the user's own consulate rows for this catalog step (per post). */
+  consulateStepId?: string;
 };
 
 export const INTAKE_NOTE_COPY: Readonly<Record<IntakeNoteKey, IntakeCopy>> = {
@@ -24,13 +26,13 @@ export const INTAKE_NOTE_COPY: Readonly<Record<IntakeNoteKey, IntakeCopy>> = {
     sourceIds: ["it-gu-dm-2024-02-29-art3", "us-miami-dn-self-employed-pdf", "us-new-york-dnv", "us-boston-dnv"],
   },
   likely_needed: {
-    text: "The decree says digital nomads must request a partita IVA and sets no deadline for it. The general rule for starting an activity is to file form AA9/12 generally within 30 days (Agenzia delle Entrate). Ask the Agenzia or a commercialista how that applies to you after your codice fiscale is issued.",
+    text: "The decree says digital nomads must request a partita IVA and sets no deadline for it. The Agenzia delle Entrate says form AA9/12 is generally filed within 30 days of starting a professional activity. Ask the Agenzia or a commercialista how that applies to you after your codice fiscale is issued.",
     sourceIds: ["it-gu-dm-2024-02-29-art6", "it-ade-partita-iva-howto", "it-ade-partita-iva-aa9"],
     uncertain: true,
   },
   employee_contract_evidence: {
-    text: "Bring your employment or collaboration contract, or a binding job offer, for highly qualified work. US posts say the salary must meet the relevant Italian collective agreement and not fall below the ISTAT median. They also ask for a signed letter from your employer stating no listed convictions in the last five years, with a copy of the signer's ID.",
-    sourceIds: ["it-gu-dm-2024-02-29-art3", "us-new-york-dnv", "us-los-angeles-dnv", "us-miami-rw-subordinate-pdf", "us-washington-dnv-checklist-pdf"],
+    text: "Bring your employment or collaboration contract, or a binding job offer, for highly qualified work. Under the decree, the employer's signed declaration of no listed convictions in the last five years, with a copy of the signer's ID, is tied to employers resident in Italy. US posts ask every remote worker for it, so include it if your consulate asks.",
+    sourceIds: ["it-gu-dm-2024-02-29-art3", "us-new-york-dnv", "us-los-angeles-dnv", "us-washington-dnv-checklist-pdf", "us-miami-rw-subordinate-pdf"],
   },
   registered_lease: {
     text: "US posts want the lease in your name, covering the entire visa period. It should be an original \"Contratto di Locazione ad Uso Abitativo\" with proof that the landlord registered it with the Agenzia delle Entrate.",
@@ -41,7 +43,7 @@ export const INTAKE_NOTE_COPY: Readonly<Record<IntakeNoteKey, IntakeCopy>> = {
     sourceIds: ["us-new-york-dnv", "us-boston-dnv", "us-washington-dnv-checklist-pdf", "it-gu-dm-2024-02-29-art3"],
   },
   housing_needed_before_appointment: {
-    text: "You'll need housing settled before your appointment. US posts want a lease or deed in your name that covers the whole visa period. Several posts, including New York, say a hotel stay or a hospitality offer is not accepted. Secure a registered lease or deed before you book or attend.",
+    text: "You'll need housing settled before your appointment. US posts generally ask for a lease, rental contract, or deed in your name covering the whole visa period. Several posts, including New York, say a hotel stay or a hospitality offer is not accepted. Secure a registered lease or deed before you book or attend.",
     sourceIds: ["it-gu-dm-2024-02-29-art3", "us-new-york-dnv", "us-boston-dnv", "us-los-angeles-dnv", "us-washington-dnv-checklist-pdf"],
   },
   children_birth_certs: {
@@ -63,6 +65,7 @@ export const INTAKE_FLAG_COPY: Readonly<Record<IntakeFlagCode, IntakeCopy>> = {
   INCOME_BELOW_THRESHOLD: {
     text: "The decree requires lawful yearly income of at least three times the healthcare-ticket exemption minimum. It does not print a euro figure, and the figures on consulate pages are dated. Confirm the current amount with your consulate before you apply. Your other steps stay the same.",
     sourceIds: ["it-gu-dm-2024-02-29-art3"],
+    consulateStepId: "proof-of-income",
   },
   TIMELINE: {
     text: "This is your goal, not an official deadline. Washington lets you book up to six months ahead and no later than 15 days before departure. New York lets you book up to 180 days ahead.",

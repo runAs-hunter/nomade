@@ -106,7 +106,7 @@ const PRIOR_EXPERIENCE_DETAIL =
 
 /** Nomad-only income sentence. Not shared with the remote-worker step. */
 const NOMAD_PROOF_OF_INCOME_DETAIL =
-  "The decree sets annual lawful income at not less than three times the minimum used for exemption from the healthcare ticket. It does not print a euro amount, and the figures on US consulate pages differ and are dated. The income must come from the work, and passive income does not count. Check your consulate's current figure before you apply.";
+  "The decree sets annual lawful income at not less than three times the minimum used for exemption from the healthcare ticket. It does not print a euro amount. US posts say the income must come from the work, and that passive income does not count. US consulate pages print a figure dated 2024 (one is undated). Check your consulate's current figure.";
 
 /** Remote-worker income sentence. Separate constant so it cannot inherit the nomad text. */
 const REMOTE_PROOF_OF_INCOME_DETAIL =
@@ -137,7 +137,7 @@ const VISA_FEE_DETAIL =
   "For a stay over 90 days the fee is the type D national visa, and the US posts say it is non-refundable. The consular tariff for 1 Oct 2026 through 31 Dec 2026 lists that visa at €116. Washington’s fee page, updated 2 Oct 2026, prints $133.60 for that quarter, not euros. New York, Los Angeles, and San Francisco reset the dollar amount on 1 January, 1 April, 1 July, and 1 October. This pack states no dollar figure for those three.";
 
 const PERMESSO_DETAIL =
-  "Within eight working days of entry, request it at the Questura of the province where you are. The decree says directly at the Questura. Whether a post office can take this permit is not confirmed. US posts say to check that Questura. Bring the documents the consulate stamped. The card reads “nomade digitale - lavoratore da remoto.” It lasts at most one year and can be renewed if the conditions still hold. Polizia di Stato’s general page, modified 5 Jan 2024, prints a €40 contribution for a permit of more than three months and up to one year, and an average issue time of about 60 days. Confirm both locally. Missing the eight days can mean administrative expulsion, unless the delay is force majeure. Spouse and minor-child reunification is a separate Questura process. If family is joining you, it is listed as its own step.";
+  "Within eight working days of entry, request it at the Questura of the province where you are. The decree says directly at the Questura. Whether a post office can take this permit is not confirmed. US posts say to check that Questura. Bring the documents the consulate stamped. The card reads “nomade digitale - lavoratore da remoto.” It lasts at most one year and can be renewed if the conditions still hold. Polizia di Stato’s general page, modified 5 Jan 2024, prints a €40 contribution for a permit of more than three months and up to one year, and an average issue time of about 60 days. Confirm both locally. Missing the eight days can mean administrative expulsion, unless the delay is force majeure. Spouse and minor-child reunification is a separate Questura process.";
 
 const CODICE_FISCALE_DETAIL =
   "The Questura generates it when the permit is issued and notifies Agenzia delle Entrate. That is the normal path. A separate office form exists, and a first code for a non-EU citizen needs an in-person appointment. Same-day issue at the tax office is not stated.";
@@ -153,7 +153,7 @@ const EMPLOYMENT_CONTRACT_DETAIL =
 
 /** F11a conditional (family ≠ solo). Visa Ops 2026-10-16. */
 const FAMILY_DOCUMENTS_DETAIL =
-  "The decree lets digital nomads and remote workers bring a spouse and minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.";
+  "The decree lets digital nomads and remote workers bring a spouse aged 18 or over and unmarried minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.";
 
 /** F11a conditional (family ≠ solo). Visa Ops 2026-10-16. */
 const FAMILY_PERMESSO_DETAIL =

@@ -56,17 +56,18 @@ type Authed =
 async function authed(request: Request, failMessage: string): Promise<Authed> {
   const requestId = getRequestId(request);
   const logger = log.child({ requestId });
-  if (!isIntakeEnabled()) return { res: disabled(requestId) }
+  // Auth first: an anonymous caller learns nothing about the flag (Cap review).
   const auth = await requireAccess(request, { requestId, logger, failMessage });
-  if (auth instanceof NextResponse) return { res: auth }
+  if (auth instanceof NextResponse) return { res: auth };
+  if (!isIntakeEnabled()) return { res: disabled(requestId) };
   const service = createServiceClient();
   const account = await requireActiveJourneyAccount(service, auth.userId);
-  if (!account.ok) return { res: activeAccountErrorResponse(account, requestId) }
+  if (!account.ok) return { res: activeAccountErrorResponse(account, requestId) };
   const caseRes = await getJourneyCase(service, auth.userId);
-  if (!caseRes.ok) return { res: internal(requestId, "Failed to load journey case") }
-  if (!caseRes.case) return { res: noCase(requestId) }
+  if (!caseRes.ok) return { res: internal(requestId, "Failed to load journey case") };
+  if (!caseRes.case) return { res: noCase(requestId) };
   const ctx: Ctx = { requestId, logger };
-  return { ctx, service, userId: auth.userId, journeyCase: caseRes.case }
+  return { ctx, service, userId: auth.userId, journeyCase: caseRes.case };
 }
 
 /**

@@ -17,7 +17,7 @@ import {
   type JourneyPathId,
   type JourneyStepStatus,
 } from "@/lib/journey/catalog";
-import { getJourneyCase } from "@/lib/journey/case";
+import { getJourneyCase, isStepWritable } from "@/lib/journey/case";
 import {
   intakePatchesFor,
   isStepVisible,
@@ -126,7 +126,7 @@ export async function patchStepStatus(
 
   const pathId = caseRes.case.pathId as JourneyPathId;
   const stepDef = getStepDef(pathId, args.stepId);
-  if (!stepDef) {
+  if (!stepDef || !isStepWritable(stepDef)) {
     return {
       ok: false,
       code: "UNKNOWN_STEP",
