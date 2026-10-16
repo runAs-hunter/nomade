@@ -144,6 +144,32 @@ describe("/api/journey/intake (F11a)", () => {
     expect(body.questions.map((q: { key: string }) => q.key)).toEqual(["incomeSource", "incomeThreshold", "housing", "family", "arrivalMonth"]);
     expect(body.answers).toEqual({});
     expect(body.completedAt).toBeNull();
+    const family = body.questions.find((q: { key: string }) => q.key === "family");
+    expect(family.followUps).toEqual([{ key: "childrenCount", min: 1, max: 10, showWhen: ["spouse_children", "children"] }]);
+  });
+
+  it("PUT childrenCount 0 / 11 / 2.5 / \"2\" → 400 BAD_INTAKE", async () => {
+    for (const childrenCount of [0, 11, 2.5, "2"]) {
+      const res = await PUT(req("PUT", { answers: { family: "children", childrenCount }, clientUpdatedAt: new Date().toISOString() }));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error.code).toBe("BAD_INTAKE");
+    }
+    expect(tables.journey_intake).toHaveLength(0);
+  });
+
+  it("PUT childrenCount with family spouse → stored without it", async () => {
+    const res = await PUT(req("PUT", { answers: { family: "spouse", childrenCount: 2 }, clientUpdatedAt: new Date().toISOString() }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).intake.answers).toEqual({ family: "spouse" });
+  });
+
+  it("PUT childrenCount with children is stored; completion unchanged", async () => {
+    const answers = { incomeSource: "freelancer", incomeThreshold: "yes", housing: "lease", family: "children", arrivalMonth: null, childrenCount: 2 };
+    const res = await PUT(req("PUT", { answers, clientUpdatedAt: new Date().toISOString() }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.intake.answers).toEqual(answers);
+    expect(body.intake.completedAt).not.toBeNull();
   });
 
   it("PUT bad value → 400 BAD_INTAKE", async () => {
