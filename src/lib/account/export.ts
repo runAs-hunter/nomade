@@ -7,6 +7,8 @@
  */
 
 import type { DeletionStatus } from "@/lib/account/bootstrap";
+import { isIntakeEnabled } from "@/lib/env";
+import { listStepDefsForPath } from "@/lib/journey/catalog";
 import { loadBillingForExport } from "@/lib/billing/entitlements";
 
 export type ExportAccount = {
@@ -37,6 +39,15 @@ export type ExportJourneyCase = {
   createdAt: string;
   updatedAt: string;
   steps: ExportJourneyStep[];
+  /** F11a: intake answers for this case (null when none). Exported regardless of INTAKE_ENABLED. */
+  intake: ExportJourneyIntake | null;
+};
+
+export type ExportJourneyIntake = {
+  answers: Record<string, unknown>;
+  rulesVersion: string;
+  completedAt: string | null;
+  updatedAt: string;
 };
 
 export type ExportBillingEntitlement = {
@@ -102,7 +113,7 @@ export type BuildExportResult =
     };
 
 const EXPORT_NOTES = [
-  "journey filled when a case exists (F3); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
+  "journey filled when a case exists (F3), with intake answers per case (F11a); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
 ];
 
 /**
@@ -170,6 +181,20 @@ type JourneyStepExportRow = {
   updated_at: string;
 };
 
+const CONDITIONAL_STEP_IDS: ReadonlySet<string> = new Set(
+  (["italy_digital_nomad", "italy_remote_worker"] as const).flatMap((p) =>
+    listStepDefsForPath(p).filter((d) => d.conditional).map((d) => d.id),
+  ),
+);
+
+type JourneyIntakeExportRow = {
+  case_id: string;
+  answers: Record<string, unknown> | null;
+  rules_version: string;
+  completed_at: string | null;
+  updated_at: string;
+};
+
 /** Load journey cases + step states for export (user-scoped). */
 export async function loadJourneyForExport(
   service: AccountDbClient,
@@ -206,9 +231,30 @@ export async function loadJourneyForExport(
     return { ok: false, code: "DB_ERROR", message: "Failed to read journey steps" };
   }
 
+  const intakeRes = await db
+    .from("journey_intake")
+    .select("case_id, answers, rules_version, completed_at, updated_at")
+    .in("case_id", caseIds);
+  if (intakeRes.error) {
+    return { ok: false, code: "DB_ERROR", message: "Failed to read journey intake" };
+  }
+  const intakeByCase = new Map<string, ExportJourneyIntake>();
+  for (const r of (intakeRes.data as JourneyIntakeExportRow[] | null) ?? []) {
+    intakeByCase.set(r.case_id, {
+      answers: r.answers ?? {},
+      rulesVersion: r.rules_version,
+      completedAt: r.completed_at,
+      updatedAt: r.updated_at,
+    });
+  }
+
   const steps = (stepRes.data as JourneyStepExportRow[] | null) ?? [];
   const byCase = new Map<string, ExportJourneyStep[]>();
+  // F11a: conditional (rule-added) step rows stay out of the export while
+  // INTAKE_ENABLED is off (they are never seeded then; legacy rows are hidden).
+  const intakeOn = isIntakeEnabled();
   for (const s of steps) {
+    if (!intakeOn && CONDITIONAL_STEP_IDS.has(s.step_id)) continue;
     const list = byCase.get(s.case_id) ?? [];
     list.push({
       stepId: s.step_id,
@@ -225,6 +271,7 @@ export async function loadJourneyForExport(
     createdAt: c.created_at,
     updatedAt: c.updated_at,
     steps: byCase.get(c.id) ?? [],
+    intake: intakeByCase.get(c.id) ?? null,
   }));
 
   return { ok: true, journey };

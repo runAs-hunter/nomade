@@ -54,6 +54,8 @@ export const serverEnvSchema = z
     APP_STORE_ALLOW_SANDBOX: z.enum(["true", "false"]).optional(),
     /** F10 paywall flag. "true" enforces the Apply/After-arrival gate. Default OFF. */
     BILLING_GATE_ENABLED: z.enum(["true", "false"]).optional(),
+    /** F11a intake flag. "true" serves /api/journey/intake + applies rules. Default OFF. */
+    INTAKE_ENABLED: z.enum(["true", "false"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (looksLikeServiceRoleJwt(data.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
@@ -127,6 +129,7 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     APP_STORE_BUNDLE_ID: source.APP_STORE_BUNDLE_ID || undefined,
     APP_STORE_ALLOW_SANDBOX: source.APP_STORE_ALLOW_SANDBOX || undefined,
     BILLING_GATE_ENABLED: source.BILLING_GATE_ENABLED || undefined,
+    INTAKE_ENABLED: source.INTAKE_ENABLED || undefined,
   });
 
   if (!result.success) {
@@ -306,4 +309,13 @@ export function getAppStoreBillingConfig(
  */
 export function isBillingGateEnabled(source: EnvSource = process.env): boolean {
   return optionalTrimmed(source.BILLING_GATE_ENABLED) === "true";
+}
+
+/**
+ * F11a intake flag (default OFF). Off: /api/journey/intake → 404 INTAKE_DISABLED,
+ * sync intake ops rejected, checklist ignores stored answers (export still
+ * includes them). Read per request.
+ */
+export function isIntakeEnabled(source: EnvSource = process.env): boolean {
+  return optionalTrimmed(source.INTAKE_ENABLED) === "true";
 }

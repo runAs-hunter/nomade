@@ -7,7 +7,9 @@
 import type { AccountDbClient } from "@/lib/account/export";
 import { stepRequiresEntitlement } from "@/lib/billing/catalog";
 import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
-import { isBillingGateEnabled } from "@/lib/env";
+import { isBillingGateEnabled, isIntakeEnabled } from "@/lib/env";
+import { parseIntakeAnswers, type IntakeAnswers } from "@/lib/journey/intake";
+import { saveIntakeLww } from "@/lib/journey/intake-store";
 import {
   getStepDef,
   isJourneyStepStatus,
@@ -17,6 +19,7 @@ import {
 } from "@/lib/journey/catalog";
 import {
   getJourneyCase,
+  isStepWritable,
   upsertJourneyCase,
   userHasJourneyCase,
 } from "@/lib/journey/case";
@@ -31,12 +34,27 @@ import {
   type MergeSide,
 } from "@/lib/journey/merge";
 
-export type SyncMutation = {
+export type SyncStepMutation = {
   opId: string;
+  kind?: "step";
   stepId: string;
   status: JourneyStepStatus;
   clientUpdatedAt?: string;
 };
+
+/** F11a: whole-answers replace, last-write-wins on clientUpdatedAt. */
+export type SyncIntakeMutation = {
+  opId: string;
+  kind: "intake";
+  answers: IntakeAnswers;
+  clientUpdatedAt: string;
+};
+
+export type SyncMutation = SyncStepMutation | SyncIntakeMutation;
+
+function isStepMutation(m: SyncMutation): m is SyncStepMutation {
+  return m.kind !== "intake";
+}
 
 export type SyncRejected = {
   opId: string;
@@ -76,7 +94,7 @@ export function isValidOpId(value: unknown): value is string {
 }
 
 /** Parse + validate sync mutations; invalid entries rejected with codes. */
-export function parseSyncMutations(raw: unknown): {
+export function parseSyncMutations(raw: unknown, now: Date = new Date()): {
   mutations: SyncMutation[];
   rejected: SyncRejected[];
   fatal?: string;
@@ -118,6 +136,25 @@ export function parseSyncMutations(raw: unknown): {
     }
     seenOpIds.add(opId);
 
+    if (row.kind === "intake") {
+      const cua = typeof row.clientUpdatedAt === "string" ? row.clientUpdatedAt.trim() : "";
+      if (cua.length === 0 || Number.isNaN(Date.parse(cua))) {
+        rejected.push({ opId, code: "BAD_MUTATION" });
+        continue;
+      }
+      const parsed = parseIntakeAnswers(row.answers, now);
+      if (!parsed.ok) {
+        rejected.push({ opId, code: "BAD_INTAKE" });
+        continue;
+      }
+      mutations.push({ opId, kind: "intake", answers: parsed.answers, clientUpdatedAt: cua });
+      continue;
+    }
+    if (row.kind !== undefined && row.kind !== "step") {
+      rejected.push({ opId, code: "BAD_MUTATION" });
+      continue;
+    }
+
     if (typeof row.stepId !== "string" || row.stepId.trim().length === 0) {
       rejected.push({ opId, code: "BAD_STEP_ID" });
       continue;
@@ -148,7 +185,7 @@ async function applyOneMutation(
   args: {
     caseId: string;
     pathId: JourneyPathId;
-    mutation: SyncMutation;
+    mutation: SyncStepMutation;
     nowIso: string;
     /** In-memory map of step_id → current side (mutated as we go). */
     live: Map<string, MergeSide>;
@@ -158,7 +195,7 @@ async function applyOneMutation(
 ): Promise<"applied" | SyncRejected> {
   const { mutation, pathId, caseId, nowIso, live } = args;
   const stepDef = getStepDef(pathId, mutation.stepId);
-  if (!stepDef) {
+  if (!stepDef || !isStepWritable(stepDef)) {
     return { opId: mutation.opId, code: "UNKNOWN_STEP" };
   }
   // F10: sync must not bypass the PATCH gate.
@@ -327,7 +364,7 @@ export async function syncJourney(
   let paidAllowed = true;
   if (
     isBillingGateEnabled() &&
-    args.mutations.some((m) => {
+    args.mutations.filter(isStepMutation).some((m) => {
       const def = getStepDef(pathId, m.stepId);
       return def ? stepRequiresEntitlement(def.phaseId) : false;
     })
@@ -339,7 +376,28 @@ export async function syncJourney(
     paidAllowed = ent.active;
   }
 
+  const intakeOn = isIntakeEnabled();
   for (const mutation of args.mutations) {
+    if (!isStepMutation(mutation)) {
+      // F11a: intake is always free (no entitlement check).
+      if (!intakeOn) {
+        rejected.push({ opId: mutation.opId, code: "INTAKE_DISABLED" });
+        continue;
+      }
+      const saved = await saveIntakeLww(service, {
+        caseId: journeyCase.caseId,
+        answers: mutation.answers,
+        clientUpdatedAt: mutation.clientUpdatedAt,
+        nowIso,
+      });
+      if (!saved.ok) {
+        rejected.push({ opId: mutation.opId, code: "DB_ERROR" });
+        continue;
+      }
+      // Older clientUpdatedAt → no-op, still applied (replay-safe).
+      appliedOpIds.push(mutation.opId);
+      continue;
+    }
     const result = await applyOneMutation(service, {
       caseId: journeyCase.caseId,
       pathId,

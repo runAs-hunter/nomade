@@ -20,7 +20,7 @@ export const SOURCE_DOC_TYPES = [
 ] as const;
 export type SourceDocType = (typeof SOURCE_DOC_TYPES)[number];
 
-export const SOURCE_STATUSES = ["active", "stale", "retired"] as const;
+export const SOURCE_STATUSES = ["active", "stale", "retired", "inactive"] as const;
 export type SourceStatus = (typeof SOURCE_STATUSES)[number];
 
 /** DB row shape (`internal.sources`, snake_case). */

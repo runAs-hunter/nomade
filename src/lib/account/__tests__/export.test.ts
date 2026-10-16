@@ -59,7 +59,7 @@ describe("buildExportEnvelope", () => {
       chat: [],
       billing: { entitlements: [], events: [] },
       notes: [
-        "journey filled when a case exists (F3); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
+        "journey filled when a case exists (F3), with intake answers per case (F11a); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
       ],
     });
   });
@@ -91,6 +91,7 @@ function makeExportService(state: {
   identities: FakeRow[];
   journeyCases?: FakeRow[];
   journeySteps?: FakeRow[];
+  journeyIntake?: FakeRow[];
 }) {
   const journeyCases = state.journeyCases ?? [];
   const journeySteps = state.journeySteps ?? [];
@@ -108,6 +109,7 @@ function makeExportService(state: {
             if (table === "auth_identities") return state.identities;
             if (table === "journey_cases") return journeyCases;
             if (table === "journey_step_states") return journeySteps;
+            if (table === "journey_intake") return state.journeyIntake ?? [];
             if (table === "entitlements") return [];
             if (table === "billing_events") return [];
             return [];
@@ -258,6 +260,16 @@ describe("loadAccountExport", () => {
           updated_at: "2026-09-11T12:00:00.000Z",
         },
       ],
+      journeyIntake: [
+        {
+          case_id: caseId,
+          answers: { incomeSource: "freelancer", family: "spouse" },
+          rules_version: "f11-rules-2026-10-16",
+          completed_at: null,
+          client_updated_at: "2026-09-12T00:00:00.000Z",
+          updated_at: "2026-09-12T00:00:01.000Z",
+        },
+      ],
     });
     const res = await loadAccountExport(service, USER_ID, EXPORTED_AT);
     expect(res.ok).toBe(true);
@@ -281,6 +293,13 @@ describe("loadAccountExport", () => {
             updatedAt: "2026-09-11T12:00:00.000Z",
           },
         ],
+        // F11a: journey[].intake (no client_updated_at in the export).
+        intake: {
+          answers: { incomeSource: "freelancer", family: "spouse" },
+          rulesVersion: "f11-rules-2026-10-16",
+          completedAt: null,
+          updatedAt: "2026-09-12T00:00:01.000Z",
+        },
       },
     ]);
   });

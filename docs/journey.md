@@ -105,3 +105,16 @@ Runbook: F9 "Checklist cites official sources". Additive fields; older clients i
 - Free: path select, case create, all of **Gather documents**. Paid: **Apply** + **After arrival** status writes (PATCH → `403 ENTITLEMENT_REQUIRED`; sync ops → rejected `ENTITLEMENT_REQUIRED`).
 - Checklist GET: `access` per phase/step + `entitlement.journeyFull`. Locked steps return title + `sources`, `detail: ""`. Disclaimer unchanged.
 - Export/purge include billing — see [`billing.md`](./billing.md).
+
+## F11a — Intake → rules (`INTAKE_ENABLED`, default off)
+
+- Storage: `internal.journey_intake (case_id PK → journey_cases(id) on delete cascade)`. A path change updates `journey_cases.path_id` in place, so answers survive it; account purge deletes the case and the intake cascades.
+- Questions (5, server-owned, `GET /api/journey/intake`): `incomeSource` (`foreign_employee|freelancer|business_owner|mixed|unsure`), `incomeThreshold` (`yes|no|unsure`), `housing` (`lease|own|not_yet|unsure`), `family` (`solo|spouse|spouse_children|children|unsure`, art. 29 c.1 a/b), `arrivalMonth` (`YYYY-MM`, at most +24 months, past accepted; `null` = not sure). "Not sure" is stored explicitly so `completedAt` is set once all 5 keys are present; an absent key = not reached. The FBI question was dropped (Cap, 2026-10-16).
+- `PUT /api/journey/intake {answers, clientUpdatedAt}` → `{intake, applied, checklist}` (auth is checked before the flag); whole-object replace, LWW on `clientUpdatedAt`. `400 BAD_INTAKE`, `404 NO_JOURNEY_CASE`. Free.
+- Sync: `{opId, kind: "intake", answers, clientUpdatedAt}`; older clock = applied no-op; bad answers → `BAD_INTAKE` per op.
+- Rules (`src/lib/journey/intake.ts`, `INTAKE_RULES_VERSION = "f11-rules-2026-10-16"`): pure, deterministic. Patches: `hide`, `add` (conditional catalog steps `family-documents`, `family-permesso`), `note`, `flag`. Hidden steps keep state rows and leave progress. Copy (Visa Ops) lives in `intake-copy.ts`; every entry cites source ids, filtered to the path's active rows. No euro figures.
+- Flag off: conditional family steps are not seeded, not writable (`UNKNOWN_STEP`), and not exported.
+- `INCOME_BELOW_THRESHOLD` also carries `consulateSourceIds: {<postId>: [ids]}`; the device cites its own post's rows.
+- Checklist additions (only when on): `intake {completed, rulesVersion, sources}` (`sources` = every row cited by a flag, a flag's `consulateSourceIds`, or a note, so clients can always render the citation), `flags [{code, text, sourceIds, consulateSourceIds?}]`, step `notes [{key, text, sourceIds, uncertain?}]`, step `origin "catalog"|"intake"`.
+- Dev-only data fixes live in `scripts/dev-only/` (never migrations, never prod).
+- Export: `journey[].intake = {answers, rulesVersion, completedAt, updatedAt}` (null when none).

@@ -72,5 +72,6 @@ iOS and browser clients receive **anon/publishable** only. Service role stays on
 | `APP_STORE_BUNDLE_ID` | Optional | Defaults to `com.izaya.Nomade` |
 | `APP_STORE_ALLOW_SANDBOX` | Optional | `true` accepts `Sandbox`/`Xcode` transactions. Set `true` on Preview **and** Production (App Review buys in Sandbox). Every event records `environment`. |
 | `BILLING_GATE_ENABLED` | Optional (default **off**) | `true` enforces the paid gate (PATCH 403 + sync rejects). Off: no gate, full details; checklist still carries `access` + `entitlement`; `entitlement.gateEnabled` mirrors this flag so clients lock only when it is on. Turn on only when the iOS paywall ships. |
+| `INTAKE_ENABLED` | Optional (default **off**) | F11a. `true` serves `GET/PUT /api/journey/intake`, accepts sync `kind: "intake"` ops, and applies intake rules in the checklist (`intake`, `flags`, per-step `notes`/`origin`, conditional family steps). Off: intake routes → 404 `INTAKE_DISABLED`, sync intake ops rejected `INTAKE_DISABLED`, checklist identical to F10. Export always includes stored answers. **Preview = `true`, Production = off** until Isaias flips it. |
 
 See [`billing.md`](./billing.md). ASSN V2 deferred to F10b.

@@ -158,7 +158,7 @@ describe("F9 buildChecklistView sources join", () => {
     const bare = buildChecklistView({ journeyCase, pathId: "italy_digital_nomad", states: [], journeyFull: true });
     const strip = (x: typeof v) => x.phases.map((p) => ({ name: p.name, steps: p.steps.map(({ id, name, detail }) => ({ id, name, detail })) }));
     expect(strip(v)).toEqual(strip(bare));
-    expect(strip(bare)).toEqual(getPhasesForPath("italy_digital_nomad").map((p) => ({ name: p.name, steps: p.steps.map(({ id, name, detail }) => ({ id, name, detail })) })));
+    expect(strip(bare)).toEqual(getPhasesForPath("italy_digital_nomad").map((p) => ({ name: p.name, steps: p.steps.filter((s) => !s.conditional).map(({ id, name, detail }) => ({ id, name, detail })) })));
     expect(v.catalogVersion).toBe(JOURNEY_CATALOG_VERSION);
     expect(v.disclaimer).toBe("Preliminary guidance \u2014 not legal advice");
     expect(v.disclaimer).toBe(JOURNEY_DISCLAIMER);

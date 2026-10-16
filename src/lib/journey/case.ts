@@ -3,6 +3,7 @@
  * Fresh server case seeds all steps not_started (no local prototype import).
  */
 
+import { isIntakeEnabled } from "@/lib/env";
 import type { AccountDbClient } from "@/lib/account/export";
 import {
   JOURNEY_COUNTRY_CODE,
@@ -117,7 +118,7 @@ export async function insertMissingCatalogSteps(
   | { ok: false; message: string }
 > {
   const have = new Set(existingStepIds);
-  const missing = listStepDefsForPath(pathId).filter((s) => !have.has(s.id));
+  const missing = seedableStepDefs(pathId).filter((s) => !have.has(s.id));
   if (missing.length === 0) {
     return { ok: true, inserted: [] };
   }
@@ -139,6 +140,20 @@ export async function insertMissingCatalogSteps(
   };
 }
 
+/**
+ * F11a: conditional (rule-added) steps are only seeded while INTAKE_ENABLED is
+ * on. Off → no family-step rows are created (Cap, nomade#32 review).
+ */
+export function seedableStepDefs(pathId: JourneyPathId) {
+  const intakeOn = isIntakeEnabled();
+  return listStepDefsForPath(pathId).filter((s) => intakeOn || !s.conditional);
+}
+
+/** F11a: a conditional step is writable only while INTAKE_ENABLED is on. */
+export function isStepWritable(def: { conditional?: true }): boolean {
+  return !def.conditional || isIntakeEnabled();
+}
+
 async function seedStepStates(
   service: AccountDbClient,
   caseId: string,
@@ -146,7 +161,7 @@ async function seedStepStates(
   nowIso: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const db = service.schema("internal");
-  const steps = listStepDefsForPath(pathId);
+  const steps = seedableStepDefs(pathId);
   const rows = steps.map((s) => ({
     case_id: caseId,
     step_id: s.id,
