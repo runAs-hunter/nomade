@@ -7,7 +7,6 @@ import {
   titleFromMessage,
 } from "@/data/route-schema";
 import { classifyMessage } from "@/lib/route-classify";
-import { POST } from "@/app/api/route/route";
 
 // ─── Schema + coercion ───────────────────────────────────────────────────────
 
@@ -152,25 +151,4 @@ describe("classifyMessage", () => {
   });
 });
 
-// ─── Route handler ───────────────────────────────────────────────────────────
-
-describe("POST /api/route", () => {
-  it("returns 400 for an empty message", async () => {
-    const req = { json: async () => ({ message: "   " }) } as never;
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-  });
-
-  it("returns a degraded fallback (200) when the body can't be parsed", async () => {
-    const req = {
-      json: async () => {
-        throw new Error("bad json");
-      },
-    } as never;
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.topic).toBe("general");
-    expect(body.threadId).toBeNull();
-  });
-});
+// Route handler tests (auth-gated since F11 step 0) live in route-route.test.ts.
