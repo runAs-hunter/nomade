@@ -83,6 +83,8 @@ export type ChecklistEntitlement = {
   journeyFull: boolean;
   /** F10: present (true) when the entitlement read failed; journeyFull is false. */
   unavailable?: true;
+  /** F10: mirrors BILLING_GATE_ENABLED. Clients lock only when true. */
+  gateEnabled: boolean;
 };
 
 export type GetChecklistResult =
@@ -124,12 +126,12 @@ export function buildChecklistView(args: {
   journeyFull?: boolean;
   /** F10: entitlement read failed (fallback journeyFull=false). */
   entitlementUnavailable?: boolean;
-  /** F10: BILLING_GATE_ENABLED. Default true for the pure join; getChecklist passes env. */
+  /** F10: BILLING_GATE_ENABLED. Default false (matches the env default); getChecklist passes env. */
   gateEnabled?: boolean;
 }): ChecklistView {
   const sources = args.sources ?? EMPTY_SOURCE_INDEX;
   const journeyFull = args.journeyFull ?? false;
-  const gateEnabled = args.gateEnabled ?? true;
+  const gateEnabled = args.gateEnabled ?? false;
   const stateById = new Map(args.states.map((s) => [s.step_id, s]));
   const fallbackUpdatedAt = args.journeyCase.updatedAt;
   const phases = getPhasesForPath(args.pathId).map((phase) => {
@@ -165,7 +167,9 @@ export function buildChecklistView(args: {
     disclaimer: JOURNEY_DISCLAIMER,
     consulateSources: sources.consulateSources,
     sourcesVersion: sources.sourcesVersion,
-    entitlement: args.entitlementUnavailable ? { journeyFull, unavailable: true } : { journeyFull },
+    entitlement: args.entitlementUnavailable
+      ? { journeyFull, unavailable: true, gateEnabled }
+      : { journeyFull, gateEnabled },
   };
 }
 
