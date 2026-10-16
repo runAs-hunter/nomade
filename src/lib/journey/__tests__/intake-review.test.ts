@@ -150,6 +150,51 @@ describe("F11a review (nomade#32)", () => {
     expect(flag?.consulateSourceIds).toEqual({ "new-york": ["us-new-york-dnv"] });
   });
 
+  it("intake.sources carries every cited row (flags, consulate rows, notes) so no citation is dropped", () => {
+    const row = (id: string, scope: string, steps: string[]): ChecklistSourceRow =>
+      ({
+        id, path_ids: ["italy_digital_nomad"], country: "IT", title: id, publisher: "p",
+        official_url: "https://example.esteri.it/" + id, doc_type: "consular_guidance", scope,
+        retrieved_at: "2026-10-16", status: "active", step_ids: steps, updated_at: "2026-10-16T00:00:00Z",
+      }) as unknown as ChecklistSourceRow;
+    const sources = indexChecklistSources(
+      [
+        // Cited by the flag but mapped to no step the client sees as a step row.
+        row("it-gu-dm-2024-02-29-art3", "national", ["proof-of-income"]),
+        row("us-new-york-dnv", "US-consulate:new-york", ["proof-of-income", "accommodation"]),
+      ],
+      "italy_digital_nomad",
+    );
+    const v = buildChecklistView({
+      journeyCase: { caseId: CASE_ID, pathId: "italy_digital_nomad", countryCode: "IT", createdAt: NOW, updatedAt: NOW },
+      pathId: "italy_digital_nomad",
+      states: [],
+      sources,
+      intakeEnabled: true,
+      intake: {
+        answers: { incomeThreshold: "no", housing: "not_yet", family: "spouse", incomeSource: "freelancer", arrivalMonth: null },
+        rulesVersion: "f11-rules-2026-10-16", completedAt: NOW, clientUpdatedAt: NOW, updatedAt: NOW,
+      },
+    });
+    const have = new Set((v.intake?.sources ?? []).map((s) => s.id));
+    expect(have.has("it-gu-dm-2024-02-29-art3")).toBe(true);
+    expect(have.has("us-new-york-dnv")).toBe(true);
+    const cited = [
+      ...(v.flags ?? []).flatMap((f) => [...f.sourceIds, ...Object.values(f.consulateSourceIds ?? {}).flat()]),
+      ...v.phases.flatMap((p) => p.steps.flatMap((s) => (s.notes ?? []).flatMap((n) => n.sourceIds))),
+    ];
+    for (const id of cited) expect(have.has(id), id).toBe(true);
+  });
+
+  it("flag off: no intake.sources key", () => {
+    const v = buildChecklistView({
+      journeyCase: { caseId: CASE_ID, pathId: "italy_digital_nomad", countryCode: "IT", createdAt: NOW, updatedAt: NOW },
+      pathId: "italy_digital_nomad",
+      states: [],
+    });
+    expect(v.intake).toBeUndefined();
+  });
+
   it("purge: wipeJourney deletes the user's cases and the intake goes with them (cascade); others untouched", async () => {
     const tables = {
       journey_cases: [
@@ -185,5 +230,16 @@ describe("F11a review (nomade#32)", () => {
     const res = await wipeJourney(db, USER_ID);
     expect(res.wiped).toBe(1);
     expect(tables.journey_intake).toEqual([{ case_id: OTHER_CASE, answers: { family: "solo" } }]);
+  });
+});
+
+describe("F11a catalog income sentence (Cap blocker)", () => {
+  it("nomad proof-of-income ends with the exact consulate-figure sentence and no euro figure", async () => {
+    const { listStepDefsForPath } = await import("@/lib/journey/catalog");
+    const step = listStepDefsForPath("italy_digital_nomad").find((s) => s.id === "proof-of-income");
+    expect(step?.detail.endsWith(
+      "Most US consulate pages print a figure dated 2024; Houston's 2026 checklist prints a newer one. Check your consulate's current figure.",
+    )).toBe(true);
+    expect(step?.detail).not.toMatch(/€\s?\d|\d[\d,.]*\s?(euros?|EUR)\b|EUR\s?\d/i);
   });
 });

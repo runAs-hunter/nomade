@@ -2,7 +2,7 @@
 -- A path change keeps the journey_cases row (case.ts updates path_id in place),
 -- so the intake hangs off case_id and is wiped with the case (purge cascade).
 -- Access: Next.js + service_role after requireAccess (no client-direct grants).
--- Apply scope: local + nomade-dev ONLY. NEVER nomade-prod.
+-- Apply scope: local + nomade-dev ONLY. not nomade-prod until F11a launch.
 
 create table if not exists internal.journey_intake (
   case_id uuid primary key references internal.journey_cases (id) on delete cascade,

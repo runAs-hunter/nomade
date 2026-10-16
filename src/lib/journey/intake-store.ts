@@ -66,7 +66,7 @@ export function intakeShouldWrite(stored: string | null | undefined, incoming: s
 /**
  * Replace the answers when `clientUpdatedAt` is newer than the stored one.
  * Older/equal → no-op (`applied: false`), which callers treat as success.
- * `completed_at` is set once, the first time all 6 keys are present.
+ * `completed_at` is set once, the first time all 5 keys are present.
  */
 export async function saveIntakeLww(
   service: AccountDbClient,

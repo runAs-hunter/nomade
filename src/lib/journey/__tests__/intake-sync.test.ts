@@ -122,7 +122,7 @@ describe("F11a sync intake ops", () => {
     const ids = r1.checklist.phases.flatMap((p) => p.steps.map((s) => s.id));
     expect(ids).toContain("family-documents");
     expect(ids).not.toContain("partita-iva");
-    expect(r1.checklist.intake).toEqual({ completed: false, rulesVersion: "f11-rules-2026-10-16" });
+    expect(r1.checklist.intake).toMatchObject({ completed: false, rulesVersion: "f11-rules-2026-10-16" });
 
     const older = parseSyncMutations([intakeOp(OP2, { family: "solo" }, "2026-10-16T10:00:00.000Z")], new Date(NOW));
     const r2 = await syncJourney(db, { userId: USER_ID, mutations: older.mutations, nowIso: NOW });

@@ -1,6 +1,6 @@
 -- F11a: source summaries (Visa Ops, 2026-10-16) + two new rows + family step mapping.
 -- GENERATED from docs/sources/F11-source-summaries.csv (32 rows) and /workspace/F11-visa-ops-copy.md.
--- Apply scope: local + nomade-dev ONLY. NEVER nomade-prod.
+-- Apply scope: local + nomade-dev ONLY. not nomade-prod until F11a launch.
 
 alter table internal.sources
   add column if not exists summary text check (summary is null or length(summary) <= 800),
@@ -56,7 +56,7 @@ values
   ('us-houston-dnv-checklist-2026-docx', array['italy_digital_nomad', 'italy_remote_worker']::text[], 'IT', 'Digital nomad checklist 2026 (Houston, docx)', 'Consulate General of Italy Houston',
    'https://conshouston.esteri.it/wp-content/uploads/2026/07/DIGITAL-NOMAD-Checklist-2026.docx',
    'consular_guidance', 'US-consulate:houston', '2026-10-16'::date, 'inactive',
-   'Uploaded Jul 2026, linked from us-houston-dnv. States a 2026 minimum legal income of no less than EUR 30,000 (other posts still print EUR 24,789 dated 2024). INACTIVE until Visa Ops confirms the URL. Not cited.', array['proof-of-income']::text[]),
+   'Uploaded Jul 2026, linked from us-houston-dnv. States a 2026 minimum legal income figure newer than the 2024 figure other posts print. INACTIVE until Visa Ops confirms the URL. Not cited.', array['proof-of-income']::text[]),
   ('it-normattiva-dlgs-286-1998-art29', array['italy_digital_nomad', 'italy_remote_worker']::text[], 'IT', 'D.Lgs. 286/1998 art. 29 – Ricongiungimento familiare', 'Normattiva',
    'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1998-07-25;286~art29',
    'law', 'national', '2026-10-16'::date, 'active',

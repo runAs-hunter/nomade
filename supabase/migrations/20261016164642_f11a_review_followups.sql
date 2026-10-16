@@ -5,7 +5,7 @@
 -- 4) Clean up conditional family step rows seeded while INTAKE_ENABLED was off
 --    (Preview loads of the earlier #32 build); never touches rows a user changed.
 -- GENERATED from docs/sources/F11-source-summaries.csv (33 rows).
--- Apply scope: local + nomade-dev ONLY. NEVER nomade-prod.
+-- Apply scope: local + nomade-dev ONLY. not nomade-prod until F11a launch.
 
 update internal.sources set summary = 'Agenzia delle Entrate page (last updated 7 March 2025) explaining the codice fiscale: a 16-character code that identifies people in dealings with public bodies. It says that for foreign citizens who apply for or renew a permesso di soggiorno, the Questura assigns the code; residents abroad can ask an Italian consulate. People without a code can request one with form AA4/8 by PEC or at any Agenzia office by appointment; a non-EU applicant attaches a valid passport with visa, a valid permesso, or another listed ID. A first code for a foreign citizen needs an in-person appointment for identification. A certificate of assignment is issued while the Tessera Sanitaria or code card is pending.', summary_reviewed_at = '2026-10-16'::date, summary_uncertain = false where id = 'it-ade-codice-fiscale';
 update internal.sources set summary = 'Agenzia delle Entrate information sheet (last updated 30 October 2023). To open, change, or close a partita IVA for a professional activity or other activity that does not require registration in the Registro delle imprese or the REA, an individual fills in and sends form AA9/12 to the Agenzia. For a business or craft activity, it says to use the Comunicazione Unica d''impresa (an Infocamere service), which also handles registration in the Registro delle imprese or REA. The page does not mention visas or digital nomads.', summary_reviewed_at = '2026-10-16'::date, summary_uncertain = false where id = 'it-ade-partita-iva-aa9';
@@ -48,11 +48,9 @@ update internal.sources
 update internal.sources
   set status = 'active',
       retrieved_at = '2026-10-16'::date,
-      notes = 'Uploaded Jul 2026 (Last-Modified 20 Jul 2026), linked from us-houston-dnv; URL confirmed by Visa Ops 2026-10-16 (HTTP 200, docx). States a 2026 minimum legal income of no less than EUR 30,000 (other posts still print EUR 24,789 dated 2024).'
+      notes = 'Uploaded Jul 2026 (Last-Modified 20 Jul 2026), linked from us-houston-dnv; URL confirmed by Visa Ops 2026-10-16 (HTTP 200, docx). States a 2026 minimum legal income figure newer than the 2024 figure other posts print.'
   where id = 'us-houston-dnv-checklist-2026-docx';
 
-delete from internal.journey_step_states
-  where step_id in ('family-documents', 'family-permesso')
-    and status = 'not_started'
-    and not exists (select 1 from internal.journey_intake i where i.case_id = journey_step_states.case_id);
+-- Family step-row cleanup moved to scripts/dev-only/f11a-family-step-cleanup.sql (dev only, not a migration).
+
 

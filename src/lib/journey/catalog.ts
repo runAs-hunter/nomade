@@ -106,7 +106,7 @@ const PRIOR_EXPERIENCE_DETAIL =
 
 /** Nomad-only income sentence. Not shared with the remote-worker step. */
 const NOMAD_PROOF_OF_INCOME_DETAIL =
-  "The decree sets annual lawful income at not less than three times the minimum used for exemption from the healthcare ticket. It does not print a euro amount. US posts say the income must come from the work, and that passive income does not count. US consulate pages print a figure dated 2024 (one is undated). Check your consulate's current figure.";
+  "The decree sets annual lawful income at not less than three times the minimum used for exemption from the healthcare ticket. It does not print a euro amount. US posts say the income must come from the work, and that passive income does not count. Most US consulate pages print a figure dated 2024; Houston's 2026 checklist prints a newer one. Check your consulate's current figure.";
 
 /** Remote-worker income sentence. Separate constant so it cannot inherit the nomad text. */
 const REMOTE_PROOF_OF_INCOME_DETAIL =

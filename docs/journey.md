@@ -115,5 +115,6 @@ Runbook: F9 "Checklist cites official sources". Additive fields; older clients i
 - Rules (`src/lib/journey/intake.ts`, `INTAKE_RULES_VERSION = "f11-rules-2026-10-16"`): pure, deterministic. Patches: `hide`, `add` (conditional catalog steps `family-documents`, `family-permesso`), `note`, `flag`. Hidden steps keep state rows and leave progress. Copy (Visa Ops) lives in `intake-copy.ts`; every entry cites source ids, filtered to the path's active rows. No euro figures.
 - Flag off: conditional family steps are not seeded, not writable (`UNKNOWN_STEP`), and not exported.
 - `INCOME_BELOW_THRESHOLD` also carries `consulateSourceIds: {<postId>: [ids]}`; the device cites its own post's rows.
-- Checklist additions (only when on): `intake {completed, rulesVersion}`, `flags [{code, text, sourceIds}]`, step `notes [{key, text, sourceIds, uncertain?}]`, step `origin "catalog"|"intake"`.
+- Checklist additions (only when on): `intake {completed, rulesVersion, sources}` (`sources` = every row cited by a flag, a flag's `consulateSourceIds`, or a note, so clients can always render the citation), `flags [{code, text, sourceIds, consulateSourceIds?}]`, step `notes [{key, text, sourceIds, uncertain?}]`, step `origin "catalog"|"intake"`.
+- Dev-only data fixes live in `scripts/dev-only/` (never migrations, never prod).
 - Export: `journey[].intake = {answers, rulesVersion, completedAt, updatedAt}` (null when none).

@@ -86,6 +86,11 @@ export type ChecklistIntakeFlag = {
 export type ChecklistIntakeSummary = {
   completed: boolean;
   rulesVersion: string;
+  /**
+   * Every source row cited by a flag or note (incl. consulateSourceIds), so the
+   * client never has to drop a citation it cannot find in step/consulate rows.
+   */
+  sources: ChecklistSourceView[];
 };
 
 export type ChecklistPhaseView = {
@@ -276,6 +281,7 @@ export function buildChecklistView(args: {
     view.intake = {
       completed: Boolean(args.intake?.completedAt),
       rulesVersion: INTAKE_RULES_VERSION,
+      sources: [],
     };
     const seen = new Set<IntakeFlagCode>();
     view.flags = [];
@@ -296,6 +302,17 @@ export function buildChecklistView(args: {
       }
       view.flags.push(flag);
     }
+    const cited = new Set<string>();
+    for (const f of view.flags) {
+      f.sourceIds.forEach((id) => cited.add(id));
+      Object.values(f.consulateSourceIds ?? {}).forEach((ids) => ids.forEach((id) => cited.add(id)));
+    }
+    for (const list of notesByStep.values()) list.forEach((n) => n.sourceIds.forEach((id) => cited.add(id)));
+    const byId = sources.byId ?? new Map<string, ChecklistSourceView>();
+    view.intake.sources = [...cited]
+      .sort()
+      .map((id) => byId.get(id))
+      .filter((s): s is ChecklistSourceView => Boolean(s));
   }
   return view;
 }

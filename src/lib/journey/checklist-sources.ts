@@ -65,6 +65,8 @@ export type ChecklistSourceIndex = {
   sourcesVersion: string | null;
   /** F11a: every active id for this path (citable by intake notes/flags). */
   activeIds?: ReadonlySet<string>;
+  /** F11a: every active row for this path by id, so intake citations resolve. */
+  byId?: ReadonlyMap<string, ChecklistSourceView>;
 };
 
 export const EMPTY_SOURCE_INDEX: ChecklistSourceIndex = {
@@ -82,12 +84,14 @@ export function indexChecklistSources(
   const consulateSources: Record<string, ChecklistSourceView[]> = {};
   let sourcesVersion: string | null = null;
   const activeIds = new Set<string>();
+  const byId = new Map<string, ChecklistSourceView>();
   const sorted = [...rows].sort((a, b) => a.id.localeCompare(b.id));
   for (const row of sorted) {
     if (row.status !== "active") continue;
     if (!(row.path_ids ?? []).includes(pathId)) continue;
     activeIds.add(row.id);
     if (!/^https:\/\//.test(row.official_url) || !sourceHost(row.official_url)) continue;
+    byId.set(row.id, toChecklistSource(row, false));
     const stepIds = row.step_ids ?? [];
     if (stepIds.length === 0) continue;
     if (!sourcesVersion || row.updated_at > sourcesVersion) sourcesVersion = row.updated_at;
@@ -105,7 +109,7 @@ export function indexChecklistSources(
       byStep.set(stepId, list);
     }
   }
-  return { byStep, consulateSources, sourcesVersion, activeIds };
+  return { byStep, consulateSources, sourcesVersion, activeIds, byId };
 }
 
 /** Active rows tagged with pathId, plus updated_at for sourcesVersion. */
