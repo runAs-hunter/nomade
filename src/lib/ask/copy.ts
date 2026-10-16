@@ -16,6 +16,12 @@ export const ASK_MAX_SOURCES = 8;
 export const ASK_MAX_MESSAGES = 6;
 export const ASK_MAX_MESSAGE_CHARS = 1000;
 /** Cap decision 9. */
+/**
+ * Relevance floor (Cap, #34): when the best candidate scores below this, the
+ * question is treated as off-topic → refusal without a model call. One
+ * distinctive word (in ≤ ~1/6 of rows) plus any boost clears it.
+ */
+export const ASK_RELEVANCE_FLOOR = 2.0;
 export const ASK_TEMPERATURE = 0.2;
 export const ASK_MAX_OUTPUT_TOKENS = 600;
 
@@ -23,6 +29,7 @@ export const ASK_OUTCOMES = [
   "answered",
   "refused_no_source",
   "refused_uncited",
+  "refused_unsupported",
   "rate_limited",
   "error",
 ] as const;

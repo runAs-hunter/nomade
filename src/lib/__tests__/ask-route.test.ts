@@ -13,6 +13,17 @@ const REFUSAL =
 const SECRET_QUESTION = "Zebracorn-7781 health insurance question from jane@example.com";
 
 const verifyAccessToken = vi.fn();
+const promptHooks = vi.hoisted(() => ({ throwOnBuild: false }));
+vi.mock("@/lib/ask/prompt", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/ask/prompt")>("@/lib/ask/prompt");
+  return {
+    ...actual,
+    buildSystemPrompt: (...a: Parameters<typeof actual.buildSystemPrompt>) => {
+      if (promptHooks.throwOnBuild) throw new Error("prompt build failed");
+      return actual.buildSystemPrompt(...a);
+    },
+  };
+});
 const gatewayStreamText = vi.fn();
 let db: ReturnType<typeof makeDb>;
 
@@ -145,9 +156,10 @@ let tables: Record<string, Row[]>;
 let consumeResult: number;
 let modelCalls: AskModelRequest[];
 
-function fakeModel(deltas: string[], opts: { throwAfter?: number } = {}): AskModel {
+function fakeModel(deltas: string[], opts: { throwAfter?: number; onCall?: () => void } = {}): AskModel {
   return (req) => {
     modelCalls.push(req);
+    opts.onCall?.();
     async function* gen() {
       let i = 0;
       for (const d of deltas) {
@@ -163,9 +175,10 @@ function fakeModel(deltas: string[], opts: { throwAfter?: number } = {}): AskMod
 
 const deps = (model: AskModel) => ({ service: () => db, model, now: () => new Date(NOW) });
 
-const req = (body: unknown, auth = "Bearer good", path = "/api/ask") =>
+const req = (body: unknown, auth = "Bearer good", path = "/api/ask", signal?: AbortSignal) =>
   new Request(`http://localhost${path}`, {
     method: "POST",
+    signal,
     headers: { "content-type": "application/json", ...(auth ? { authorization: auth } : {}) },
     body: JSON.stringify(body),
   });
@@ -206,6 +219,7 @@ beforeEach(() => {
     value: { user: { id: USER_ID } as unknown as User, userId: USER_ID, accessToken: "t" },
   });
   gatewayStreamText.mockReset();
+  promptHooks.throwOnBuild = false;
   logSpies = [vi.spyOn(console, "log"), vi.spyOn(console, "warn"), vi.spyOn(console, "error"), vi.spyOn(console, "info")];
   logSpies.forEach((s) => s.mockImplementation(() => {}));
 });
@@ -275,7 +289,9 @@ describe("POST /api/ask (F11b)", () => {
     const evs = await readSse(res);
     expect(streamedText(evs)).toBe(REFUSAL);
     const final = finalOf(evs);
-    expect(final).toMatchObject({ outcome: "refused_no_source", citations: [], disclaimer: DISCLAIMER, refusal: REFUSAL, remaining: 9, limit: 10 });
+    expect(final).toMatchObject({ outcome: "refused_no_source", citations: [], disclaimer: DISCLAIMER, refusal: REFUSAL, remaining: 10, limit: 10 });
+    // No-source refusal does not use up a question.
+    expect(db.rpcCalls.map((c) => c.fn)).not.toContain("ask_consume");
     expect(evs.at(-1)).toEqual({ done: true });
     expect(modelCalls).toHaveLength(0);
     expect(tables.ask_events).toHaveLength(1);
@@ -312,7 +328,12 @@ describe("POST /api/ask (F11b)", () => {
     expect(call.system).toContain("consulate_post: new-york");
     expect(call.system).toContain("health-insurance (gather, not_started)");
     expect(call.userTag).not.toContain(USER_ID);
-    expect(call.messages).toEqual([{ role: "user", content: SECRET_QUESTION }]);
+    expect(call.messages).toEqual([{ role: "user", content: `<question>\n${SECRET_QUESTION}\n</question>` }]);
+    // Approved step text is context labelled as Nomade guidance, never a numbered source.
+    expect(call.system).toContain("<nomade_guidance>");
+    expect(call.system).toMatch(/<guidance step="health-insurance">You need medical and hospital coverage/);
+    expect(call.system).toContain("It is NOT a source: never cite it");
+    expect(call.system.match(/<source n="S\d+"/g)).toHaveLength(2);
 
     // Metadata-only event.
     expect(tables.ask_events[0]).toMatchObject({
@@ -334,13 +355,81 @@ describe("POST /api/ask (F11b)", () => {
     expect(tables.ask_events[0]).toMatchObject({ outcome: "refused_uncited" });
   });
 
-  it("upstream error mid-stream → outcome error, question refunded, error text never logged", async () => {
-    const evs = await readSse(await handleAsk(req(ask()), deps(fakeModel(["partial [S1]", "more"], { throwAfter: 1 }))));
+  it("upstream error before any text → outcome error, question refunded, error text never logged", async () => {
+    const evs = await readSse(await handleAsk(req(ask()), deps(fakeModel(["partial [S1]"], { throwAfter: 0 }))));
     const final = finalOf(evs);
     expect(final).toMatchObject({ outcome: "error", citations: [], refusal: REFUSAL, remaining: 10 });
     expect(db.rpcCalls.map((c) => c.fn)).toEqual(["ask_consume", "ask_refund"]);
     expect(tables.ask_events[0]).toMatchObject({ outcome: "error" });
     expect(allLogged()).not.toContain("upstream boom");
+  });
+
+  it("upstream error after text was sent → error, NOT refunded", async () => {
+    const evs = await readSse(await handleAsk(req(ask()), deps(fakeModel(["partial [S1]", "more"], { throwAfter: 1 }))));
+    expect(streamedText(evs)).toBe("partial [S1]");
+    expect(finalOf(evs)).toMatchObject({ outcome: "error", remaining: 9 });
+    expect(db.rpcCalls.map((c) => c.fn)).toEqual(["ask_consume"]);
+  });
+
+  it("client abort → NOT refunded", async () => {
+    const ac = new AbortController();
+    const res = await handleAsk(
+      req(ask(), "Bearer good", "/api/ask", ac.signal),
+      deps(fakeModel(["x [S1]"], { throwAfter: 0, onCall: () => ac.abort() })),
+    );
+    await res.text().catch(() => "");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(db.rpcCalls.map((c) => c.fn)).toEqual(["ask_consume"]);
+  });
+
+  it("throw after consume but before the stream starts → 500 and the question is refunded", async () => {
+    promptHooks.throwOnBuild = true;
+    const res = await handleAsk(req(ask("health insurance?")), deps(fakeModel(["x [S1]"])));
+    expect(res.status).toBe(500);
+    expect(db.rpcCalls.map((c) => c.fn)).toEqual(["ask_consume", "ask_refund"]);
+    expect(db.rpcCalls[1]!.args).toMatchObject({ p_user: USER_ID, p_day: "2026-10-16" });
+    expect(modelCalls).toHaveLength(0);
+  });
+
+  it("accepts at most 12 messages", async () => {
+    const turns = (n: number) => ({
+      messages: Array.from({ length: n }, (_, i) => ({ role: i % 2 === 0 ? "user" : "assistant", content: `health insurance ${i}` })),
+    });
+    expect((await handleAsk(req(turns(13)), deps(fakeModel(["ok [S1]"])))).status).toBe(400);
+    const ok = await handleAsk(req(turns(11)), deps(fakeModel(["ok [S1]"])));
+    expect(ok.status).toBe(200);
+    await ok.text();
+  });
+
+  it("relevance floor: a weak best match → refusal without a model call or consume", async () => {
+    // "portal" appears in every filler row → low IDF, below the floor.
+    const res = await handleAsk(req(ask("Tell me about the portal page")), deps(fakeModel(["x [S1]"])));
+    const evs = await readSse(res);
+    expect(finalOf(evs)).toMatchObject({ outcome: "refused_no_source", refusal: REFUSAL });
+    expect(streamedText(evs)).toBe(REFUSAL);
+    expect(modelCalls).toHaveLength(0);
+    expect(db.rpcCalls).toHaveLength(0);
+  });
+
+  it("invented number → refused_unsupported (number not in a cited source's summary/title)", async () => {
+    const evs = await readSse(
+      await handleAsk(req(ask("health insurance?", { consulatePostId: "new-york" })), deps(fakeModel(["Coverage of at least €50,000 [S1]."]))),
+    );
+    expect(finalOf(evs)).toMatchObject({ outcome: "refused_unsupported", citations: [], refusal: REFUSAL, disclaimer: DISCLAIMER });
+    expect(tables.ask_events[0]).toMatchObject({ outcome: "refused_unsupported" });
+  });
+
+  it("number present in a cited source passes; a number only in an UNcited source does not", async () => {
+    const run = async (text: string) =>
+      finalOf(await readSse(await handleAsk(req(ask("health insurance letter?", { consulatePostId: "new-york" })), deps(fakeModel([text])))));
+    // us-new-york-dnv summary says "30,000 euros".
+    const sys = () => modelCalls.at(-1)!.system;
+    const okFinal = await run("New York asks for a letter of at least €30.000 [S1][S2].");
+    const nyN = sys().indexOf('id="us-new-york-dnv"') > sys().indexOf('n="S2"') ? 2 : 1;
+    expect(okFinal.outcome).toBe("answered");
+    const otherN = nyN === 1 ? 2 : 1;
+    const bad = await run(`New York asks for 30,000 euros [S${otherN}].`);
+    expect(bad.outcome).toBe("refused_unsupported");
   });
 
   it("over the limit → 429 ASK_RATE_LIMITED { limit, resetAt }, model not called", async () => {
@@ -359,7 +448,7 @@ describe("POST /api/ask (F11b)", () => {
     const limits: unknown[] = [];
     const run = async () => {
       db.rpcCalls.length = 0;
-      await (await handleAsk(req(ask("Which neighborhood in Milan is best?")), deps(fakeModel([])))).text();
+      await (await handleAsk(req(ask("health insurance?")), deps(fakeModel(["ok [S1]"])))).text();
       limits.push(db.rpcCalls.find((c) => c.fn === "ask_consume")!.args.p_limit);
     };
     await run();

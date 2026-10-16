@@ -27,10 +27,12 @@ import {
   ASK_MAX_MESSAGE_CHARS,
   ASK_MAX_MESSAGES,
   ASK_REFUSAL,
+  ASK_RELEVANCE_FLOOR,
   type AskOutcome,
 } from "@/lib/ask/copy";
 import { CitationStreamFilter, extractCitations, stripAllMarkers } from "@/lib/ask/citations";
 import type { AskModel, AskModelMessage } from "@/lib/ask/model";
+import { unsupportedNumbers } from "@/lib/ask/numbers";
 import { buildSystemPrompt, type AskUserContext } from "@/lib/ask/prompt";
 import { loadAskSources, rankSources, type AskSourceRow } from "@/lib/ask/retrieve";
 import {
@@ -77,7 +79,7 @@ const messageSchema = z.object({
 });
 
 const bodySchema = z.object({
-  messages: z.array(messageSchema).min(1).max(50),
+  messages: z.array(messageSchema).min(1).max(12),
   focusStepId: z.string().trim().min(1).max(64).nullish(),
   consulatePostId: z.enum(US_CONSULATE_POST_IDS).nullish(),
 });
@@ -122,6 +124,15 @@ export function parseAskBody(raw: unknown): { ok: true; body: ParsedAskBody } | 
       consulatePostId: parsed.data.consulatePostId ?? null,
     },
   };
+}
+
+/** The latest user turn goes to the model inside a <question> block (data, not instructions). */
+export function wrapLastQuestion(messages: AskModelMessage[]): AskModelMessage[] {
+  return messages.map((m, i) =>
+    i === messages.length - 1 && m.role === "user"
+      ? { role: "user", content: `<question>\n${m.content.replace(/<\/?question\b[^>]*>/gi, "")}\n</question>` }
+      : m,
+  );
 }
 
 function internalError(requestId: string, message: string): NextResponse {
@@ -195,6 +206,10 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
   const body = parsed.body;
 
   const service = deps.service();
+  // Set once a question is consumed; cleared when the stream takes ownership
+  // of refunds. The outer catch refunds whenever it is still set (Cap, #34).
+  let consumed: { ok: true; remaining: number } | { ok: false } | null = null;
+  let consumedDay: string | null = null;
   try {
     const account = await requireActiveJourneyAccount(service, userId);
     if (!account.ok) return activeAccountErrorResponse(account, requestId);
@@ -226,14 +241,49 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
     const sourcesRes = await loadAskSources(service, checklist.pathId);
     if (!sourcesRes.ok) return internalError(requestId, "Failed to load sources");
 
-    // Rate limit (atomic). Counted before any model call.
     const nowDate = now();
     const day = utcDay(nowDate);
     const resetAt = resetAtFor(nowDate);
     const { limit, tier } = await limitFor(service, userId, logger, uh);
-    const consumed = await consumeAsk(service, userId, limit, day);
-    if (!consumed.ok) return internalError(requestId, "Failed to check usage");
+
+    const userMessages = body.messages.filter((m) => m.role === "user").map((m) => m.content);
+    const question = userMessages[userMessages.length - 1]!;
+    const focusName = body.focusStepId ? steps.find((s) => s.id === body.focusStepId)?.name ?? null : null;
+    const ranked = rankSources(sourcesRes.rows, {
+      question,
+      priorQuestions: userMessages.slice(0, -1),
+      focusStepId: body.focusStepId,
+      focusStepName: focusName,
+      visibleStepIds: steps.map((s) => s.id),
+      stepTexts,
+      consulatePostId: body.consulatePostId,
+    });
+    // Relevance floor: a weak best match is off-topic → refusal, no model call.
+    const topScore = ranked[0]?.score ?? 0;
+    const sources = topScore >= ASK_RELEVANCE_FLOOR ? ranked.map((r) => r.row) : [];
+    const encoder = new TextEncoder();
+    const headers = { ...SSE_HEADERS, [REQUEST_ID_HEADER]: requestId };
+
+    if (sources.length === 0) {
+      const used = await readAskUsed(service, userId, day);
+      const base = { disclaimer: ASK_DISCLAIMER, remaining: Math.max(0, limit - (used.ok ? used.used : 0)), limit, resetAt };
+      await recordAskEvent(service, userId, {
+        outcome: "refused_no_source",
+        focusStepId: body.focusStepId,
+        latencyMs: Date.now() - started,
+      });
+      logger.info("ask done", { userHash: uh, outcome: "refused_no_source", candidates: 0, belowFloor: ranked.length > 0, topScore: Number(topScore.toFixed(2)), tier, latencyMs: Date.now() - started });
+      const final: AskFinal = { outcome: "refused_no_source", citations: [], refusal: ASK_REFUSAL, ...base };
+      const text = sse({ delta: { text: ASK_REFUSAL } }) + sse({ final }) + "data: [DONE]\n\n";
+      return new Response(encoder.encode(text), { status: 200, headers });
+    }
+
+    // Rate limit (atomic). Counted only when the model will be called (Cap, #34):
+    // a no-source / below-floor refusal never uses up a question.
+    consumed = await consumeAsk(service, userId, limit, day);
+    if (!consumed.ok) { consumed = null; return internalError(requestId, "Failed to check usage"); }
     if (consumed.remaining < 0) {
+      consumed = null;
       await recordAskEvent(service, userId, { outcome: "rate_limited", focusStepId: body.focusStepId });
       logger.info("ask rate limited", { userHash: uh, limit, tier, outcome: "rate_limited" });
       const res = NextResponse.json(
@@ -251,35 +301,8 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
       return res;
     }
     const remaining = consumed.remaining;
-
-    const userMessages = body.messages.filter((m) => m.role === "user").map((m) => m.content);
-    const question = userMessages[userMessages.length - 1]!;
-    const focusName = body.focusStepId ? steps.find((s) => s.id === body.focusStepId)?.name ?? null : null;
-    const ranked = rankSources(sourcesRes.rows, {
-      question,
-      priorQuestions: userMessages.slice(0, -1),
-      focusStepId: body.focusStepId,
-      focusStepName: focusName,
-      visibleStepIds: steps.map((s) => s.id),
-      stepTexts,
-      consulatePostId: body.consulatePostId,
-    });
-    const sources = ranked.map((r) => r.row);
+    consumedDay = day;
     const base = { disclaimer: ASK_DISCLAIMER, remaining, limit, resetAt };
-    const encoder = new TextEncoder();
-    const headers = { ...SSE_HEADERS, [REQUEST_ID_HEADER]: requestId };
-
-    if (sources.length === 0) {
-      await recordAskEvent(service, userId, {
-        outcome: "refused_no_source",
-        focusStepId: body.focusStepId,
-        latencyMs: Date.now() - started,
-      });
-      logger.info("ask done", { userHash: uh, outcome: "refused_no_source", candidates: 0, tier, latencyMs: Date.now() - started });
-      const final: AskFinal = { outcome: "refused_no_source", citations: [], refusal: ASK_REFUSAL, ...base };
-      const text = sse({ delta: { text: ASK_REFUSAL } }) + sse({ final }) + "data: [DONE]\n\n";
-      return new Response(encoder.encode(text), { status: 200, headers });
-    }
 
     const ctx: AskUserContext = {
       pathId: checklist.pathId,
@@ -287,6 +310,9 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
       consulatePostId: body.consulatePostId,
       focusStepId: body.focusStepId,
       steps,
+      guidance: checklist.phases.flatMap((p) =>
+        p.steps.filter((s) => s.detail.length > 0).map((s) => ({ stepId: s.id, text: s.detail })),
+      ),
       intake,
     };
     const system = buildSystemPrompt(sources, ctx);
@@ -295,6 +321,7 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
     const readable = new ReadableStream<Uint8Array>({
       async start(controller) {
         const filter = new CitationStreamFilter(sources.length);
+        let sentText = false;
         let outcome: AskFinal["outcome"] = "answered";
         let usage: { inputTokens: number | null; outputTokens: number | null } = { inputTokens: null, outputTokens: null };
         try {
@@ -302,29 +329,46 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
             model: modelId,
             fallbackModels: config.fallbackModels,
             system,
-            messages: body.messages,
+            messages: wrapLastQuestion(body.messages),
             userTag: uh,
             abortSignal: request.signal,
           });
           for await (const delta of stream.textStream) {
             const clean = filter.push(delta);
-            if (clean) controller.enqueue(encoder.encode(sse({ delta: { text: clean } })));
+            if (clean) {
+              controller.enqueue(encoder.encode(sse({ delta: { text: clean } })));
+              sentText = true;
+            }
           }
           const tail = filter.flush();
-          if (tail) controller.enqueue(encoder.encode(sse({ delta: { text: tail } })));
+          if (tail) {
+            controller.enqueue(encoder.encode(sse({ delta: { text: tail } })));
+            sentText = true;
+          }
           usage = await stream.usage();
         } catch {
           outcome = "error";
         }
 
         let cited: number[] = [];
+        let unsupported = 0;
         let finalRemaining = remaining;
-        if (outcome === "error") {
+        // Refund only a clean upstream failure: never a client abort, and never
+        // once any answer text reached the client (Cap, #34).
+        const refunded = outcome === "error" && !request.signal.aborted && !sentText;
+        if (refunded) {
           await refundAsk(service, userId, day);
           finalRemaining = Math.min(limit, remaining + 1);
         } else {
           cited = extractCitations(filter.text, sources.length);
           if (cited.length === 0) outcome = "refused_uncited";
+          else {
+            unsupported = unsupportedNumbers(filter.text, cited.map((n) => sources[n - 1]!)).length;
+            if (unsupported > 0) {
+              outcome = "refused_unsupported";
+              cited = [];
+            }
+          }
         }
         const citations = cited.map((n) => toCitation(n, sources[n - 1]!));
         const final: AskFinal = {
@@ -356,6 +400,7 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
           outputTokens: usage.outputTokens,
           latencyMs,
           refused: outcome !== "answered",
+          unsupportedNumbers: unsupported,
         };
         if (outcome === "error") logger.error("ask upstream failed", meta);
         else logger.info("ask done", meta);
@@ -368,8 +413,13 @@ export async function handleAsk(request: Request, deps: AskDeps): Promise<Respon
         }
       },
     });
+    // The stream now owns the refund decision.
+    consumed = null;
     return new Response(readable, { status: 200, headers });
   } catch {
+    if (consumed && consumed.ok && consumed.remaining >= 0 && consumedDay) {
+      await refundAsk(service, userId, consumedDay);
+    }
     logger.error("ask threw", { userHash: uh, code: ERROR_CODES.INTERNAL_ERROR });
     return internalError(requestId, "Unexpected ask failure");
   }

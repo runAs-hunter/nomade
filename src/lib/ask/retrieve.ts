@@ -63,7 +63,7 @@ const STOPWORDS = new Set(
     "what which who whom whose when where why how whats wheres hows " +
     "not no yes any some all each every more most other such only own same too very just also " +
     "need needs needed get got make please tell know want like thing things really " +
-    "check come go going take use way much many long best good ok okay hi hello thanks thank " +
+    "bring check come go going take use way much many long best good ok okay hi hello thanks thank " +
     "italy italian italia visa visas nomad nomads nomade digital remote worker workers applicant applicants"
   ).split(/\s+/),
 );
