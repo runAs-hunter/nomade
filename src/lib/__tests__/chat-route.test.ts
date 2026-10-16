@@ -80,4 +80,20 @@ describe("POST /api/chat (F11 step 0: sign-in required)", () => {
     expect(text).toContain("data: [DONE]");
     expect(stream).toHaveBeenCalledTimes(1);
   });
+
+  it("valid token + mid-stream model error → stream errors, no [DONE]", async () => {
+    verifyAccessToken.mockResolvedValue({
+      ok: true,
+      value: { user: { id: USER_ID } as unknown as User, userId: USER_ID, accessToken: "t" },
+    });
+    stream.mockResolvedValue(
+      (async function* () {
+        yield { type: "content_block_delta", delta: { type: "text_delta", text: "Hel" } };
+        throw new Error("upstream");
+      })(),
+    );
+    const res = await POST(chatRequest("Bearer good"));
+    expect(res.status).toBe(200);
+    await expect(res.text()).rejects.toThrow();
+  });
 });

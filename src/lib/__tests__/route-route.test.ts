@@ -75,4 +75,36 @@ describe("POST /api/route (F11 step 0: sign-in required)", () => {
     expect(await res.json()).toEqual(result);
     expect(classifyMessage).toHaveBeenCalledTimes(1);
   });
+
+  it("valid token + empty message → 400, classifier never called", async () => {
+    verifyAccessToken.mockResolvedValue({
+      ok: true,
+      value: { user: { id: USER_ID } as unknown as User, userId: USER_ID, accessToken: "t" },
+    });
+    const req = new Request("http://localhost/api/route", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer good" },
+      body: JSON.stringify({ message: "   " }),
+    }) as unknown as import("next/server").NextRequest;
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(classifyMessage).not.toHaveBeenCalled();
+  });
+
+  it("valid token + unparseable body → degraded general fallback (200)", async () => {
+    verifyAccessToken.mockResolvedValue({
+      ok: true,
+      value: { user: { id: USER_ID } as unknown as User, userId: USER_ID, accessToken: "t" },
+    });
+    const req = new Request("http://localhost/api/route", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer good" },
+      body: "{not json",
+    }) as unknown as import("next/server").NextRequest;
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.topic).toBe("general");
+    expect(body.threadId).toBeNull();
+  });
 });

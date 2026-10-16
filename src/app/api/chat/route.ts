@@ -134,17 +134,26 @@ export async function POST(req: NextRequest) {
 
     const readable = new ReadableStream({
       async start(controller) {
-        for await (const event of stream) {
-          if (
-            event.type === "content_block_delta" &&
-            event.delta.type === "text_delta"
-          ) {
-            const data = JSON.stringify({ delta: { text: event.delta.text } });
-            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+        try {
+          for await (const event of stream) {
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta"
+            ) {
+              const data = JSON.stringify({ delta: { text: event.delta.text } });
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            }
           }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        } catch (err) {
+          // Mid-stream model failure: error name only, then error the stream.
+          logger.error("chat stream error", {
+            userId: auth.userId,
+            errorName: err instanceof Error ? err.name : "unknown",
+          });
+          controller.error(err);
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
       },
     });
 
