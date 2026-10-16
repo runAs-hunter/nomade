@@ -96,7 +96,7 @@ export const JOURNEY_STEP_SUMMARIES: JourneyStepSummaries = {
     "cover-letter":
       "Write a factual cover letter only if your post asks; the decree does not require one",
     "consulate-appointment":
-      "Book on Prenot@Mi at your residence's consulate; Washington wants an email first",
+      "Book at your residence's consulate through its booking page; Washington wants an email first.",
     "submit-application":
       "Attend in person with originals; don't book travel on an assumed decision date",
     "visa-fee":

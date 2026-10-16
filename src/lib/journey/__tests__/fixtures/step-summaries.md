@@ -6,7 +6,7 @@
 - **Rules followed:**
   - Facts come only from each step's `detail` or its sources.
   - Plain US English, sentence case, phrased as an action.
-  - Target 60–90 characters. Actual range is **66–87** (count in the table).
+  - Target 60–90 characters. Actual range is **66–93** (count in the table).
   - No euro figure in either income summary.
 - **Paths:** `both` = `italy_digital_nomad` and `italy_remote_worker`. `proof-of-income` has one summary per path, because its detail differs by path.
 
@@ -25,7 +25,7 @@
 | `criminal-record` | both | Get a police certificate only if your post asks; it is not on the decree or checklists | 86 | CRIMINAL_RECORD_DETAIL; it-gu-dm-2024-02-29-art3, US post rows |
 | `family-documents` | both (conditional) | Ask your consulate and Questura what family documents to bring for spouse or children | 85 | FAMILY_DOCUMENTS_DETAIL; it-gu-dm-2024-02-29-art4, it-normattiva-dlgs-286-1998-art29 |
 | `cover-letter` | both | Write a factual cover letter only if your post asks; the decree does not require one | 84 | COVER_LETTER_DETAIL |
-| `consulate-appointment` | both | Book on Prenot@Mi at your residence's consulate; Washington wants an email first | 80 | CONSULATE_APPOINTMENT_DETAIL; us-new-york-visa-general, us-washington-visa-booking |
+| `consulate-appointment` | both | Book at your residence's consulate through its booking page; Washington wants an email first. | 93 | CONSULATE_APPOINTMENT_DETAIL; us-new-york-visa-general, us-washington-visa-booking |
 | `submit-application` | both | Attend in person with originals; don't book travel on an assumed decision date | 78 | SUBMIT_APPLICATION_DETAIL; us-new-york-visa-general |
 | `visa-fee` | both | Pay the non-refundable type D national visa fee; amounts change each quarter | 76 | VISA_FEE_DETAIL; us-washington-visa-fees, us-los-angeles-consular-tariff-q4-2026 |
 | `permesso-soggiorno` | both | Request your permesso at the Questura within 8 working days of entry | 68 | PERMESSO_DETAIL; it-gu-dm-2024-02-29-art4 |
