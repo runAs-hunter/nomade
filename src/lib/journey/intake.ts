@@ -12,7 +12,7 @@ export const INTAKE_RULES_VERSION = "f11-rules-2026-10-16";
 export const INTAKE_QUESTIONS = [
   {
     key: "incomeSource",
-    options: ["foreign_employee", "freelancer", "business_owner", "mixed", "unsure"],
+    options: ["freelancer", "business_owner", "foreign_employee", "mixed", "unsure"],
   },
   { key: "incomeThreshold", options: ["yes", "no", "unsure"] },
   { key: "housing", options: ["lease", "own", "not_yet", "unsure"] },
