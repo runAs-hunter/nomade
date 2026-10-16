@@ -126,12 +126,12 @@ export function buildChecklistView(args: {
   journeyFull?: boolean;
   /** F10: entitlement read failed (fallback journeyFull=false). */
   entitlementUnavailable?: boolean;
-  /** F10: BILLING_GATE_ENABLED. Default true for the pure join; getChecklist passes env. */
+  /** F10: BILLING_GATE_ENABLED. Default false (matches the env default); getChecklist passes env. */
   gateEnabled?: boolean;
 }): ChecklistView {
   const sources = args.sources ?? EMPTY_SOURCE_INDEX;
   const journeyFull = args.journeyFull ?? false;
-  const gateEnabled = args.gateEnabled ?? true;
+  const gateEnabled = args.gateEnabled ?? false;
   const stateById = new Map(args.states.map((s) => [s.step_id, s]));
   const fallbackUpdatedAt = args.journeyCase.updatedAt;
   const phases = getPhasesForPath(args.pathId).map((phase) => {

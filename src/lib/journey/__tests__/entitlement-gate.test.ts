@@ -174,6 +174,7 @@ describe("F3.1 entitlement gate on PATCH (BILLING_GATE_ENABLED=true)", () => {
       pathId: "italy_digital_nomad",
       states: [],
       journeyFull: false,
+      gateEnabled: true,
     });
     expect(view.entitlement.journeyFull).toBe(false);
     const gather = view.phases.find((p) => p.name === "Gather documents");
@@ -197,6 +198,7 @@ describe("F3.1 entitlement gate on PATCH (BILLING_GATE_ENABLED=true)", () => {
           pathId,
           states: [],
           journeyFull,
+          gateEnabled: true,
         });
         expect(view.entitlement.journeyFull).toBe(journeyFull);
         for (const phase of view.phases) {
@@ -281,6 +283,18 @@ describe("F10 entitlement.gateEnabled mirrors BILLING_GATE_ENABLED", () => {
     const view = buildChecklistView({ ...base, journeyFull: false, gateEnabled: false });
     expect(view.entitlement.gateEnabled).toBe(false);
     expect(view.phases.map((p) => p.access)).toEqual(["free", "paid", "paid"]);
+  });
+
+  it("gate off + entitlement unavailable: gateEnabled false, unavailable, full detail", () => {
+    const view = buildChecklistView({ ...base, journeyFull: false, entitlementUnavailable: true, gateEnabled: false });
+    expect(view.entitlement).toEqual({ journeyFull: false, unavailable: true, gateEnabled: false });
+    expect(view.phases.every((p) => p.steps.every((s) => s.detail.length > 0))).toBe(true);
+  });
+
+  it("pure join defaults gateEnabled to false (matches env default)", () => {
+    const view = buildChecklistView({ ...base, journeyFull: false });
+    expect(view.entitlement.gateEnabled).toBe(false);
+    expect(view.phases.every((p) => p.steps.every((s) => s.detail.length > 0))).toBe(true);
   });
 
   it("isBillingGateEnabled reads the env flag (default off)", async () => {
