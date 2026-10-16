@@ -77,11 +77,11 @@ const COUNTRY: CountryData = {
           conditions: [
             {
               if: { traveling_with: "with_partner" },
-              detail: "Your partner needs their own Permesso. Additional income: €8,400/yr per dependent.",
+              detail: "Your partner needs their own Permesso.",
             },
             {
               if: { traveling_with: "with_family" },
-              detail: "Each family member needs their own Permesso. Additional income: €8,400/yr per adult + €2,800/yr per child.",
+              detail: "Each family member needs their own Permesso.",
             },
           ],
         },
@@ -152,16 +152,18 @@ describe("personalize()", () => {
     const result = personalize(COUNTRY, profile({ income_type: "freelancer", traveling_with: "with_partner" }));
     const dependentTask = result.phases[0].tasks.find((t) => t.id === "dependent-permesso");
     expect(dependentTask).toBeDefined();
-    expect(dependentTask?.detail).toContain("€8,400");
+    expect(dependentTask?.detail).toContain("partner needs their own Permesso");
+    expect(dependentTask?.detail).not.toMatch(/€|8,400|2,800/);
     expect(dependentTask?.isPersonalized).toBe(true);
   });
 
   // Profile 6: US freelancer with family
-  it("profile 6 — US freelancer with family: shows dependent family task with child amounts", () => {
+  it("profile 6 — US freelancer with family: shows dependent family task", () => {
     const result = personalize(COUNTRY, profile({ income_type: "freelancer", traveling_with: "with_family" }));
     const dependentTask = result.phases[0].tasks.find((t) => t.id === "dependent-permesso");
     expect(dependentTask).toBeDefined();
-    expect(dependentTask?.detail).toContain("€2,800");
+    expect(dependentTask?.detail).toContain("Each family member needs their own Permesso");
+    expect(dependentTask?.detail).not.toMatch(/€|8,400|2,800/);
     expect(dependentTask?.isPersonalized).toBe(true);
   });
 

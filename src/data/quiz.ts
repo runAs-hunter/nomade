@@ -136,12 +136,10 @@ export const QUIZ_STEPS: QuizStep[] = [
       {
         value: "with_partner",
         label: "Me + partner",
-        description: "Additional €8,400/yr income required",
       },
       {
         value: "with_family",
         label: "Me + family",
-        description: "Partner + children — additional €8,400/yr per adult + €2,800/yr per child",
       },
     ],
   },

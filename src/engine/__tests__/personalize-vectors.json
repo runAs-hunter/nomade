@@ -55,11 +55,11 @@
             "conditions": [
               {
                 "if": { "traveling_with": "with_partner" },
-                "detail": "Your partner needs their own Permesso. Additional income: €8,400/yr per dependent."
+                "detail": "Your partner needs their own Permesso."
               },
               {
                 "if": { "traveling_with": "with_family" },
-                "detail": "Each family member needs their own Permesso. Additional income: €8,400/yr per adult + €2,800/yr per child."
+                "detail": "Each family member needs their own Permesso."
               }
             ]
           }
@@ -113,16 +113,16 @@
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_partner" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["€8,400"] }
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["partner needs their own Permesso"] }
         ]
       }
     },
     {
-      "name": "profile 6 — US freelancer with family: dependent family task with child amounts",
+      "name": "profile 6 — US freelancer with family: dependent family task",
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_family" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["€2,800"] }
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["Each family member needs their own Permesso"] }
         ]
       }
     },
