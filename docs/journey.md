@@ -105,3 +105,13 @@ Runbook: F9 "Checklist cites official sources". Additive fields; older clients i
 - Free: path select, case create, all of **Gather documents**. Paid: **Apply** + **After arrival** status writes (PATCH → `403 ENTITLEMENT_REQUIRED`; sync ops → rejected `ENTITLEMENT_REQUIRED`).
 - Checklist GET: `access` per phase/step + `entitlement.journeyFull`. Locked steps return title + `sources`, `detail: ""`. Disclaimer unchanged.
 - Export/purge include billing — see [`billing.md`](./billing.md).
+
+## F11a — Intake → rules (`INTAKE_ENABLED`, default off)
+
+- Storage: `internal.journey_intake (case_id PK → journey_cases(id) on delete cascade)`. A path change updates `journey_cases.path_id` in place, so answers survive it; account purge deletes the case and the intake cascades.
+- Questions (5, server-owned, `GET /api/journey/intake`): `incomeSource` (`foreign_employee|freelancer|business_owner|mixed|unsure`), `incomeThreshold` (`yes|no|unsure`), `housing` (`lease|own|not_yet`), `family` (`solo|spouse|spouse_children|children`, art. 29 c.1 a/b), `arrivalMonth` (`YYYY-MM`, now…+24, or null). Absent key = skipped. The FBI question was dropped (Cap, 2026-10-16).
+- `PUT /api/journey/intake {answers, clientUpdatedAt}` → `{intake, applied, checklist}`; whole-object replace, LWW on `clientUpdatedAt`. `400 BAD_INTAKE`, `404 NO_JOURNEY_CASE`. Free.
+- Sync: `{opId, kind: "intake", answers, clientUpdatedAt}`; older clock = applied no-op; bad answers → `BAD_INTAKE` per op.
+- Rules (`src/lib/journey/intake.ts`, `INTAKE_RULES_VERSION = "f11-rules-2026-10-16"`): pure, deterministic. Patches: `hide`, `add` (conditional catalog steps `family-documents`, `family-permesso`), `note`, `flag`. Hidden steps keep state rows and leave progress. Copy (Visa Ops) lives in `intake-copy.ts`; every entry cites source ids, filtered to the path's active rows. No euro figures.
+- Checklist additions (only when on): `intake {completed, rulesVersion}`, `flags [{code, text, sourceIds}]`, step `notes [{key, text, sourceIds, uncertain?}]`, step `origin "catalog"|"intake"`.
+- Export: `journey[].intake = {answers, rulesVersion, completedAt, updatedAt}` (null when none).

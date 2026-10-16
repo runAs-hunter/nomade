@@ -6,7 +6,8 @@
 import type { AccountDbClient } from "@/lib/account/export";
 import { stepRequiresEntitlement } from "@/lib/billing/catalog";
 import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
-import { isBillingGateEnabled } from "@/lib/env";
+import { isBillingGateEnabled, isIntakeEnabled } from "@/lib/env";
+import { loadIntake } from "@/lib/journey/intake-store";
 import {
   computeProgress,
   getStepDef,
@@ -17,7 +18,12 @@ import {
   type JourneyStepStatus,
 } from "@/lib/journey/catalog";
 import { getJourneyCase } from "@/lib/journey/case";
-import { loadStepStates, type ChecklistProgress } from "@/lib/journey/checklist";
+import {
+  intakePatchesFor,
+  isStepVisible,
+  loadStepStates,
+  type ChecklistProgress,
+} from "@/lib/journey/checklist";
 import { timestampsMatch } from "@/lib/journey/merge";
 
 export type PatchStepCurrent = {
@@ -66,7 +72,15 @@ async function progressForCase(
     return { ok: false, code: "DB_ERROR", message: states.message };
   }
   const statusById = new Map(states.rows.map((s) => [s.step_id, s.status]));
-  const ordered = listStepDefsForPath(pathId).map(
+  // F11a: same visibility as the checklist (hidden/conditional steps excluded).
+  const intakeOn = isIntakeEnabled();
+  const intakeRes = intakeOn ? await loadIntake(service, caseId) : null;
+  const patches = intakePatchesFor(
+    pathId,
+    intakeOn,
+    intakeRes && intakeRes.ok ? intakeRes.intake : null,
+  );
+  const ordered = listStepDefsForPath(pathId).filter((s) => isStepVisible(s, patches)).map(
     (s) => statusById.get(s.id) ?? ("not_started" as JourneyStepStatus),
   );
   return { ok: true, progress: computeProgress(ordered) };

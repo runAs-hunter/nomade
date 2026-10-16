@@ -63,6 +63,8 @@ export type ChecklistSourceIndex = {
   byStep: Map<string, ChecklistSourceView[]>;
   consulateSources: Record<string, ChecklistSourceView[]>;
   sourcesVersion: string | null;
+  /** F11a: every active id for this path (citable by intake notes/flags). */
+  activeIds?: ReadonlySet<string>;
 };
 
 export const EMPTY_SOURCE_INDEX: ChecklistSourceIndex = {
@@ -79,10 +81,12 @@ export function indexChecklistSources(
   const byStep = new Map<string, ChecklistSourceView[]>();
   const consulateSources: Record<string, ChecklistSourceView[]> = {};
   let sourcesVersion: string | null = null;
+  const activeIds = new Set<string>();
   const sorted = [...rows].sort((a, b) => a.id.localeCompare(b.id));
   for (const row of sorted) {
     if (row.status !== "active") continue;
     if (!(row.path_ids ?? []).includes(pathId)) continue;
+    activeIds.add(row.id);
     if (!/^https:\/\//.test(row.official_url) || !sourceHost(row.official_url)) continue;
     const stepIds = row.step_ids ?? [];
     if (stepIds.length === 0) continue;
@@ -101,7 +105,7 @@ export function indexChecklistSources(
       byStep.set(stepId, list);
     }
   }
-  return { byStep, consulateSources, sourcesVersion };
+  return { byStep, consulateSources, sourcesVersion, activeIds };
 }
 
 /** Active rows tagged with pathId, plus updated_at for sourcesVersion. */

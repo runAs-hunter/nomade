@@ -89,11 +89,13 @@ describe("journey catalog", () => {
       "health-insurance",
       "accommodation",
       "criminal-record",
+      "family-documents",
       "cover-letter",
       "consulate-appointment",
       "submit-application",
       "visa-fee",
       "permesso-soggiorno",
+      "family-permesso",
       "codice-fiscale",
       "anagrafe",
       "partita-iva",
@@ -107,19 +109,21 @@ describe("journey catalog", () => {
       "health-insurance",
       "accommodation",
       "criminal-record",
+      "family-documents",
       "cover-letter",
       "employment-contract",
       "consulate-appointment",
       "submit-application",
       "visa-fee",
       "permesso-soggiorno",
+      "family-permesso",
       "codice-fiscale",
       "anagrafe",
     ]);
   });
 
   it("uses the visa ops version and the exact disclaimer", () => {
-    expect(JOURNEY_CATALOG_VERSION).toBe("visa-ops-italy-dnv-2026-10-03");
+    expect(JOURNEY_CATALOG_VERSION).toBe("visa-ops-italy-dnv-2026-10-16");
     expect(JOURNEY_CATALOG_VERSION).not.toBe("stub-italy-dnv-2026-10-01");
     expect(JOURNEY_DISCLAIMER).toBe(
       "Preliminary guidance \u2014 not legal advice",
@@ -132,9 +136,9 @@ describe("journey catalog", () => {
     expect(nomad?.name).toBe("Lawful income from the remote work");
     expect(remote?.name).toBe("Lawful income from the remote work");
     expect(nomad?.detail).toContain("healthcare ticket");
-    expect(nomad?.detail).toContain(
-      "Do not treat €24,789 or €28,000 as the law",
-    );
+    // F11 Cap override: no hardcoded euro figure; point to the consulate.
+    expect(nomad?.detail).toContain("Check your consulate's current figure");
+    expect(nomad?.detail).not.toMatch(/€\s?\d/);
     expect(remote?.detail).toContain("ISTAT median");
     expect(remote?.detail).toContain("does not set €33,000");
     expect(remote?.detail).not.toContain("healthcare ticket");
@@ -163,7 +167,8 @@ describe("journey catalog", () => {
     const fee = getStepDef("italy_digital_nomad", "visa-fee")?.detail ?? "";
     expect(fee).toContain("€116");
     const income = getStepDef("italy_digital_nomad", "proof-of-income")?.detail ?? "";
-    expect(income).toContain("€28,000");
+    expect(income).not.toContain("€24,789");
+    expect(income).not.toContain("€28,000");
   });
 
   it("validates status enum and computes progress", () => {

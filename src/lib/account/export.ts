@@ -37,6 +37,15 @@ export type ExportJourneyCase = {
   createdAt: string;
   updatedAt: string;
   steps: ExportJourneyStep[];
+  /** F11a: intake answers for this case (null when none). Exported regardless of INTAKE_ENABLED. */
+  intake: ExportJourneyIntake | null;
+};
+
+export type ExportJourneyIntake = {
+  answers: Record<string, unknown>;
+  rulesVersion: string;
+  completedAt: string | null;
+  updatedAt: string;
 };
 
 export type ExportBillingEntitlement = {
@@ -102,7 +111,7 @@ export type BuildExportResult =
     };
 
 const EXPORT_NOTES = [
-  "journey filled when a case exists (F3); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
+  "journey filled when a case exists (F3), with intake answers per case (F11a); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
 ];
 
 /**
@@ -170,6 +179,14 @@ type JourneyStepExportRow = {
   updated_at: string;
 };
 
+type JourneyIntakeExportRow = {
+  case_id: string;
+  answers: Record<string, unknown> | null;
+  rules_version: string;
+  completed_at: string | null;
+  updated_at: string;
+};
+
 /** Load journey cases + step states for export (user-scoped). */
 export async function loadJourneyForExport(
   service: AccountDbClient,
@@ -206,6 +223,23 @@ export async function loadJourneyForExport(
     return { ok: false, code: "DB_ERROR", message: "Failed to read journey steps" };
   }
 
+  const intakeRes = await db
+    .from("journey_intake")
+    .select("case_id, answers, rules_version, completed_at, updated_at")
+    .in("case_id", caseIds);
+  if (intakeRes.error) {
+    return { ok: false, code: "DB_ERROR", message: "Failed to read journey intake" };
+  }
+  const intakeByCase = new Map<string, ExportJourneyIntake>();
+  for (const r of (intakeRes.data as JourneyIntakeExportRow[] | null) ?? []) {
+    intakeByCase.set(r.case_id, {
+      answers: r.answers ?? {},
+      rulesVersion: r.rules_version,
+      completedAt: r.completed_at,
+      updatedAt: r.updated_at,
+    });
+  }
+
   const steps = (stepRes.data as JourneyStepExportRow[] | null) ?? [];
   const byCase = new Map<string, ExportJourneyStep[]>();
   for (const s of steps) {
@@ -225,6 +259,7 @@ export async function loadJourneyForExport(
     createdAt: c.created_at,
     updatedAt: c.updated_at,
     steps: byCase.get(c.id) ?? [],
+    intake: intakeByCase.get(c.id) ?? null,
   }));
 
   return { ok: true, journey };

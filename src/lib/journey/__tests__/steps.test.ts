@@ -116,7 +116,7 @@ describe("patchStepStatus", () => {
     expect(res.status).toBe("done");
     expect(res.progress.done).toBe(1);
     expect(res.progress.total).toBe(
-      listStepDefsForPath("italy_digital_nomad").length,
+      listStepDefsForPath("italy_digital_nomad").filter((s) => !s.conditional).length,
     );
     expect(state.steps.find((s) => s.step_id === "passport")?.status).toBe(
       "done",
@@ -171,7 +171,7 @@ describe("buildChecklistView", () => {
     expect(view.disclaimer).toMatch(/not legal advice/i);
     expect(view.progress.done).toBe(1);
     expect(view.progress.total).toBe(
-      listStepDefsForPath("italy_digital_nomad").length,
+      listStepDefsForPath("italy_digital_nomad").filter((s) => !s.conditional).length,
     );
     const passport = view.phases[0].steps.find((s) => s.id === "passport");
     expect(passport?.status).toBe("done");

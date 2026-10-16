@@ -6,7 +6,7 @@
 import type { AccountDbClient } from "@/lib/account/export";
 import { phaseAccess, type PhaseAccess } from "@/lib/billing/catalog";
 import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
-import { isBillingGateEnabled } from "@/lib/env";
+import { isBillingGateEnabled, isIntakeEnabled } from "@/lib/env";
 import {
   JOURNEY_CATALOG_VERSION,
   JOURNEY_DISCLAIMER,
@@ -29,6 +29,15 @@ import {
   type ChecklistSourceIndex,
   type ChecklistSourceView,
 } from "@/lib/journey/checklist-sources";
+import {
+  INTAKE_RULES_VERSION,
+  applyIntakeRules,
+  type IntakeFlagCode,
+  type IntakeNoteKey,
+  type StepPatch,
+} from "@/lib/journey/intake";
+import { INTAKE_FLAG_COPY, INTAKE_NOTE_COPY } from "@/lib/journey/intake-copy";
+import { loadIntake, type IntakeView } from "@/lib/journey/intake-store";
 import { log } from "@/lib/log";
 
 export type StepStateRow = {
@@ -48,6 +57,30 @@ export type ChecklistStepView = {
   sources: ChecklistSourceView[];
   /** F10: phase-depth gate. Paid + no entitlement → locked (detail ""). */
   access: PhaseAccess;
+  /** F11a (INTAKE_ENABLED only): Visa Ops notes appended under `detail`. */
+  notes?: ChecklistStepNote[];
+  /** F11a (INTAKE_ENABLED only): "intake" for rule-added conditional steps. */
+  origin?: "catalog" | "intake";
+};
+
+export type ChecklistStepNote = {
+  key: IntakeNoteKey;
+  text: string;
+  sourceIds: string[];
+  /** Visa Ops marked this note uncertain. */
+  uncertain?: true;
+};
+
+export type ChecklistIntakeFlag = {
+  code: IntakeFlagCode;
+  /** Visa Ops copy (TIMELINE: sub-text; the client renders "Target: <Mon YYYY>"). */
+  text: string;
+  sourceIds: string[];
+};
+
+export type ChecklistIntakeSummary = {
+  completed: boolean;
+  rulesVersion: string;
 };
 
 export type ChecklistPhaseView = {
@@ -77,6 +110,10 @@ export type ChecklistView = {
   sourcesVersion: string | null;
   /** F10: server entitlement state (the client never decides "paid"). */
   entitlement: ChecklistEntitlement;
+  /** F11a (INTAKE_ENABLED only). */
+  intake?: ChecklistIntakeSummary;
+  /** F11a (INTAKE_ENABLED only): UI cards; codes, never copy. */
+  flags?: ChecklistIntakeFlag[];
 };
 
 export type ChecklistEntitlement = {
@@ -116,6 +153,32 @@ export async function loadStepStates(
   return { ok: true, rows };
 }
 
+/**
+ * F11a visibility: a conditional step shows only when a rule adds it; a
+ * `hide` patch removes a catalog step. State rows are never deleted.
+ */
+export function isStepVisible(
+  step: { id: string; conditional?: true },
+  patches: readonly StepPatch[],
+): boolean {
+  if (patches.some((p) => p.kind === "hide" && p.stepId === step.id)) return false;
+  if (step.conditional) {
+    return patches.some((p) => p.kind === "add" && p.stepId === step.id);
+  }
+  return true;
+}
+
+/** F11a: rule patches for a case (empty when the flag is off or no intake). */
+export function intakePatchesFor(
+  pathId: JourneyPathId,
+  intakeEnabled: boolean,
+  intake: IntakeView | null | undefined,
+  now: Date = new Date(),
+): StepPatch[] {
+  if (!intakeEnabled || !intake) return [];
+  return applyIntakeRules(pathId, intake.answers, now);
+}
+
 /** Pure join for unit tests — catalog order wins; missing rows → not_started. */
 export function buildChecklistView(args: {
   journeyCase: JourneyCaseView;
@@ -128,8 +191,34 @@ export function buildChecklistView(args: {
   entitlementUnavailable?: boolean;
   /** F10: BILLING_GATE_ENABLED. Default false (matches the env default); getChecklist passes env. */
   gateEnabled?: boolean;
+  /**
+   * F11a: INTAKE_ENABLED. When false/omitted the view is byte-identical to F10
+   * (no intake/flags/notes/origin keys) and stored answers are ignored.
+   */
+  intakeEnabled?: boolean;
+  /** F11a: stored answers (null = none yet). Only read when intakeEnabled. */
+  intake?: IntakeView | null;
+  /** F11a: clock for month-relative rules (FBI timeline). */
+  now?: Date;
 }): ChecklistView {
   const sources = args.sources ?? EMPTY_SOURCE_INDEX;
+  const intakeOn = args.intakeEnabled === true;
+  const patches = intakePatchesFor(args.pathId, intakeOn, args.intake, args.now);
+  // Cite only ids present in the active source set (inactive rows never cited).
+  // When sources failed to load (empty index) the copy's ids pass through.
+  const activeIds = sources.activeIds ?? new Set<string>();
+  const cite = (ids: readonly string[]): string[] =>
+    activeIds.size === 0 ? [...ids] : ids.filter((id) => activeIds.has(id));
+  const notesByStep = new Map<string, ChecklistStepNote[]>();
+  for (const p of patches) {
+    if (p.kind !== "note") continue;
+    const copy = INTAKE_NOTE_COPY[p.noteKey];
+    const list = notesByStep.get(p.stepId) ?? [];
+    const note: ChecklistStepNote = { key: p.noteKey, text: copy.text, sourceIds: cite(copy.sourceIds) };
+    if (copy.uncertain) note.uncertain = true;
+    list.push(note);
+    notesByStep.set(p.stepId, list);
+  }
   const journeyFull = args.journeyFull ?? false;
   const gateEnabled = args.gateEnabled ?? false;
   const stateById = new Map(args.states.map((s) => [s.step_id, s]));
@@ -141,9 +230,11 @@ export function buildChecklistView(args: {
     id: phase.id,
     name: phase.name,
     access,
-    steps: phase.steps.map((step) => {
+    // F11a decision 4: hidden steps keep their state rows; they are only
+    // excluded from the view and from progress.
+    steps: phase.steps.filter((step) => isStepVisible(step, patches)).map((step) => {
       const row = stateById.get(step.id);
-      return {
+      const base: ChecklistStepView = {
         id: step.id,
         name: step.name,
         // F10 default: locked steps show title + sources only, no detail.
@@ -153,12 +244,17 @@ export function buildChecklistView(args: {
         sources: [...(sources.byStep.get(step.id) ?? [])],
         access,
       };
+      if (intakeOn) {
+        base.notes = locked ? [] : (notesByStep.get(step.id) ?? []);
+        base.origin = step.conditional ? "intake" : "catalog";
+      }
+      return base;
     }),
     };
   });
 
   const statuses = phases.flatMap((p) => p.steps.map((s) => s.status));
-  return {
+  const view: ChecklistView = {
     caseId: args.journeyCase.caseId,
     pathId: args.pathId,
     catalogVersion: JOURNEY_CATALOG_VERSION,
@@ -171,6 +267,21 @@ export function buildChecklistView(args: {
       ? { journeyFull, unavailable: true, gateEnabled }
       : { journeyFull, gateEnabled },
   };
+  if (intakeOn) {
+    view.intake = {
+      completed: Boolean(args.intake?.completedAt),
+      rulesVersion: INTAKE_RULES_VERSION,
+    };
+    const seen = new Set<IntakeFlagCode>();
+    view.flags = [];
+    for (const p of patches) {
+      if (p.kind !== "flag" || seen.has(p.code)) continue;
+      seen.add(p.code);
+      const copy = INTAKE_FLAG_COPY[p.code];
+      view.flags.push({ code: p.code, text: copy.text, sourceIds: cite(copy.sourceIds) });
+    }
+  }
+  return view;
 }
 
 export async function getChecklist(
@@ -235,6 +346,15 @@ export async function getChecklist(
     log.warn("journey checklist sources unavailable", { pathId: caseRes.case.pathId });
   }
 
+  // F11a: intake never fails the checklist — log and serve catalog defaults.
+  const intakeEnabled = isIntakeEnabled();
+  let intake: IntakeView | null = null;
+  if (intakeEnabled) {
+    const intakeRes = await loadIntake(service, caseRes.case.caseId);
+    if (intakeRes.ok) intake = intakeRes.intake;
+    else log.warn("journey checklist intake unavailable", { userId });
+  }
+
   return {
     ok: true,
     checklist: buildChecklistView({
@@ -245,6 +365,8 @@ export async function getChecklist(
       journeyFull: ent.ok ? ent.active : false,
       entitlementUnavailable: !ent.ok,
       gateEnabled: isBillingGateEnabled(),
+      intakeEnabled,
+      intake,
     }),
   };
 }
