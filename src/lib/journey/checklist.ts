@@ -13,6 +13,8 @@ import {
   computeProgress,
   getPhasesForPath,
   isKnownPathId,
+  stepSummaryFor,
+  type JourneyStepSummaries,
   type JourneyPathId,
   type JourneyPhaseId,
   type JourneyStepStatus,
@@ -61,6 +63,11 @@ export type ChecklistStepView = {
   notes?: ChecklistStepNote[];
   /** F11a (INTAKE_ENABLED only): "intake" for rule-added conditional steps. */
   origin?: "catalog" | "intake";
+  /**
+   * Task card v2: Visa Ops one-line summary. Omitted (no key) when there is no
+   * copy for this step, and on locked steps (same rule as `detail`).
+   */
+  summary?: string;
 };
 
 export type ChecklistStepNote = {
@@ -210,6 +217,8 @@ export function buildChecklistView(args: {
   intake?: IntakeView | null;
   /** F11a: clock for month-relative rules (FBI timeline). */
   now?: Date;
+  /** Task card v2: summary copy (tests inject; default = catalog). */
+  stepSummaries?: JourneyStepSummaries;
 }): ChecklistView {
   const sources = args.sources ?? EMPTY_SOURCE_INDEX;
   const intakeOn = args.intakeEnabled === true;
@@ -254,6 +263,8 @@ export function buildChecklistView(args: {
         sources: [...(sources.byStep.get(step.id) ?? [])],
         access,
       };
+      const summary = locked ? undefined : stepSummaryFor(args.pathId, step.id, args.stepSummaries);
+      if (summary) base.summary = summary;
       if (intakeOn) {
         base.notes = locked ? [] : (notesByStep.get(step.id) ?? []);
         base.origin = step.conditional ? "intake" : "catalog";

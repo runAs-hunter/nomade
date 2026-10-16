@@ -59,6 +59,35 @@ export type JourneyStepDef = {
   conditional?: true;
 };
 
+/**
+ * Task card v2: optional one-line step summary (~60–80 chars, an action
+ * phrase, cited by the same sources as `detail`). Written by Visa Ops only;
+ * never derived from `detail`. A missing summary means the app shows none.
+ * `all` applies to every path; `byPath` overrides one path (e.g. a step whose
+ * detail differs between nomad and remote worker).
+ */
+export type JourneyStepSummaries = {
+  all: Readonly<Record<string, string>>;
+  byPath?: Readonly<Partial<Record<JourneyPathId, Readonly<Record<string, string>>>>>;
+};
+
+/** Empty until Visa Ops delivers copy (Cap review). Keys are step ids. */
+export const JOURNEY_STEP_SUMMARIES: JourneyStepSummaries = { all: {} };
+
+/** Max summary length the app is designed for (one line, Dynamic Type wraps). */
+export const JOURNEY_STEP_SUMMARY_MAX = 100;
+
+/** Summary for one step on one path, or undefined. Blank strings count as absent. */
+export function stepSummaryFor(
+  pathId: JourneyPathId,
+  stepId: string,
+  summaries: JourneyStepSummaries = JOURNEY_STEP_SUMMARIES,
+): string | undefined {
+  const raw = summaries.byPath?.[pathId]?.[stepId] ?? summaries.all[stepId];
+  const text = raw?.trim();
+  return text ? text : undefined;
+}
+
 export type JourneyPhaseDef = {
   id: JourneyPhaseId;
   name: string;
