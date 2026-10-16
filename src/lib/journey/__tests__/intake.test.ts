@@ -65,6 +65,10 @@ describe("F11a intake questions + parsing", () => {
     const family = INTAKE_QUESTIONS.find((q) => q.key === "family")!;
     expect(family.options).toEqual(["solo", "spouse", "spouse_children", "children", "unsure"]);
     expect(INTAKE_QUESTIONS.find((q) => q.key === "housing")!.options).toContain("unsure");
+    // Nomad is the primary path: self-employed options lead (Studio S1, Isaias approved).
+    expect(INTAKE_QUESTIONS.find((q) => q.key === "incomeSource")!.options).toEqual([
+      "freelancer", "business_owner", "foreign_employee", "mixed", "unsure",
+    ]);
     expect(INTAKE_RULES_VERSION).toBe("f11-rules-2026-10-16");
   });
 
