@@ -33,7 +33,7 @@ One active case per user per country (`unique (user_id, country_code)`). Path ch
 - All 13 F3 step ids stay: `passport`, `proof-of-income`, `health-insurance`, `accommodation`, `criminal-record`, `cover-letter`, `financial-statements`, `consulate-appointment`, `submit-application`, `visa-fee`, `permesso-soggiorno`, `codice-fiscale`, `anagrafe`.
 - Both paths also include `highly-qualified` and `prior-experience`.
 - Thin remote-worker delta: drop `partita-iva`, add `employment-contract` (Gather documents, after `cover-letter`), and a different `proof-of-income` detail. Nomad keeps `partita-iva` (After arrival, after `anagrafe`) and does not include `employment-contract`.
-- `dependent-permesso` stays omitted.
+- `dependent-permesso` is retired: removed from `italy.yaml`. Family users get the catalog steps `family-documents` and `family-permesso` instead.
 - No SQL migration. New cases seed every step id for the chosen path as `not_started`. When a checklist is read, missing catalog ids are inserted as `not_started` only. Existing rows are not deleted and statuses are not reset. Path change still replaces step rows (F3).
 
 ## Consulate map

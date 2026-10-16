@@ -48,7 +48,7 @@
             ]
           },
           {
-            "id": "dependent-permesso",
+            "id": "example-conditional-step",
             "name": "Apply for dependent family Permesso di Soggiorno",
             "hidden_unless_matched": true,
             "tags": ["personalized"],
@@ -75,7 +75,7 @@
         "incomeWarning": false,
         "tasks": [
           { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["apostille"] },
-          { "id": "dependent-permesso", "present": false },
+          { "id": "example-conditional-step", "present": false },
           { "id": "passport", "present": true, "isPersonalized": false }
         ]
       }
@@ -86,7 +86,7 @@
       "expect": {
         "tasks": [
           { "id": "proof-of-income", "present": true, "isPersonalized": true, "detailContains": ["pay stubs"] },
-          { "id": "dependent-permesso", "present": false }
+          { "id": "example-conditional-step", "present": false }
         ]
       }
     },
@@ -113,7 +113,7 @@
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_partner" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["sponsorship starts in Italy at the Questura"] }
+          { "id": "example-conditional-step", "present": true, "isPersonalized": true, "detailContains": ["sponsorship starts in Italy at the Questura"] }
         ]
       }
     },
@@ -122,7 +122,7 @@
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_family" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["Ask your consulate and that Questura"] }
+          { "id": "example-conditional-step", "present": true, "isPersonalized": true, "detailContains": ["Ask your consulate and that Questura"] }
         ]
       }
     },
@@ -157,7 +157,7 @@
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "solo" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": false }
+          { "id": "example-conditional-step", "present": false }
         ]
       }
     }
