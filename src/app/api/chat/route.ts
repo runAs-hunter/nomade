@@ -1,5 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { requireAccess } from "@/lib/auth/require-access";
+import { log } from "@/lib/log";
+import { getRequestId } from "@/lib/request-id";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -62,7 +65,21 @@ function describeProfile(p: Profile): string {
   return parts.join(", ");
 }
 
+/**
+ * Legacy chat (pre-F11b). F11 step 0: requires a signed-in user (Bearer,
+ * `requireAccess`) so the endpoint no longer spends ANTHROPIC_API_KEY
+ * anonymously. Replaced by `/api/ask` in F11b, then 410.
+ */
 export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req);
+  const logger = log.child({ requestId });
+  const auth = await requireAccess(req, {
+    requestId,
+    logger,
+    failMessage: "chat unauthenticated",
+  });
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = await req.json();
     const messages: MessageParam[] = body.messages ?? [];
@@ -139,7 +156,11 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("Chat API error:", err);
+    // Never log message content (F11 lock); error name only.
+    logger.error("chat api error", {
+      userId: auth.userId,
+      errorName: err instanceof Error ? err.name : "unknown",
+    });
     return new Response("Internal server error", { status: 500 });
   }
 }
