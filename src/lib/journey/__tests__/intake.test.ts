@@ -256,7 +256,7 @@ describe("F11a storage + purge", () => {
   });
 
   it("journey_intake cascades from journey_cases (purge wipes it); RLS on, no client grants", () => {
-    const sql = readFileSync(join(MIGRATIONS, "20261016165900_f11a_journey_intake.sql"), "utf8");
+    const sql = readFileSync(join(MIGRATIONS, "20261016163621_f11a_journey_intake.sql"), "utf8");
     expect(sql).toContain("case_id uuid primary key references internal.journey_cases (id) on delete cascade");
     expect(sql).toContain("alter table internal.journey_intake enable row level security");
     expect(sql).toContain("revoke all on table internal.journey_intake from anon, authenticated");
