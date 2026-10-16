@@ -70,5 +70,5 @@ Model: Vercel AI Gateway through the AI SDK (`ai`). `ASK_MODEL` (default `anthro
 ## Ops (Isaias)
 
 - Vercel → AI Gateway: set a **monthly spend cap** (Cap suggests $50) and confirm ZDR for Anthropic routing.
-- `ASK_ENABLED=true` on Preview only → Cap runs the 20-question eval (`docs/ask-eval.md`, to be written by Cap). Production stays off.
+- `ASK_ENABLED=true` on Preview only → Cap runs the eval in `docs/ask-eval.md`. Pass is judged **per case** with that file's criteria (answerable A1–A12, refusals R1–R4 + T3, traps T1/T2/T4). This replaces the runbook's "12/12 cited, 8/8 refused" rule. Production stays off.
 - `/api/chat` stays as it is (sign-in required since F11 step 0, #31). It changes to `410 GONE` after the iOS Ask build is in TestFlight (runbook decision 10 / rollout step 4).
