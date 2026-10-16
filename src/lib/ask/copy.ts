@@ -15,13 +15,13 @@ export const ASK_MAX_SOURCES = 8;
 /** Request window (runbook): last 6 messages, each ≤ 1,000 chars. */
 export const ASK_MAX_MESSAGES = 6;
 export const ASK_MAX_MESSAGE_CHARS = 1000;
-/** Cap decision 9. */
 /**
  * Relevance floor (Cap, #34): when the best candidate scores below this, the
  * question is treated as off-topic → refusal without a model call. One
  * distinctive word (in ≤ ~1/6 of rows) plus any boost clears it.
  */
 export const ASK_RELEVANCE_FLOOR = 2.0;
+/** Cap decision 9. */
 export const ASK_TEMPERATURE = 0.2;
 export const ASK_MAX_OUTPUT_TOKENS = 600;
 

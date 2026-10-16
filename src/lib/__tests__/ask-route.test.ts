@@ -411,6 +411,20 @@ describe("POST /api/ask (F11b)", () => {
     expect(db.rpcCalls).toHaveLength(0);
   });
 
+  it("'Ask about this step' (focusStepId) with no keyword match clears the floor and grounds on that step's rows", async () => {
+    const res = await handleAsk(
+      req(ask("What should I do next here?", { focusStepId: "accommodation" })),
+      deps(fakeModel(["Bring a registered lease [S1]."])),
+    );
+    const evs = await readSse(res);
+    const final = finalOf(evs);
+    expect(final.outcome).toBe("answered");
+    expect((final.citations as { sourceId: string }[]).map((c) => c.sourceId)).toEqual(["us-new-york-dnv"]);
+    expect(modelCalls).toHaveLength(1);
+    expect(modelCalls[0]!.system).toContain('id="us-new-york-dnv"');
+    expect(db.rpcCalls.map((c) => c.fn)).toEqual(["ask_consume"]);
+  });
+
   it("invented number → refused_unsupported (number not in a cited source's summary/title)", async () => {
     const evs = await readSse(
       await handleAsk(req(ask("health insurance?", { consulatePostId: "new-york" })), deps(fakeModel(["Coverage of at least €50,000 [S1]."]))),

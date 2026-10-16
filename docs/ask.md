@@ -32,7 +32,7 @@ data: {"final":{"outcome":"answered","citations":[{"n":1,"sourceId":"us-new-york
 data: [DONE]
 ```
 - `outcome`: `answered` | `refused_no_source` | `refused_uncited` | `refused_unsupported` | `error`.
-  - `refused_no_source`: no source matched, or the best match is below the relevance floor (`ASK_RELEVANCE_FLOOR`, off-topic). The model is **not** called and **no question is used up**. The single delta is the refusal sentence.
+  - `refused_no_source`: no source matched, or the best match is below the relevance floor (off-topic). The floor is the code constant `ASK_RELEVANCE_FLOOR = 2.0` in `src/lib/ask/copy.ts`, not an env var. A `focusStepId` match adds +3 to its rows, so "Ask about this step" always clears it. The model is **not** called and **no question is used up**. The single delta is the refusal sentence.
   - `refused_uncited`: the model produced no valid `[S#]`. **The client replaces the streamed text with `final.refusal`.**
   - `refused_unsupported` (new): the answer cited sources but stated a number (amount, currency figure, day/month count, year, percentage, in digits) that does not appear in the summary or title of any source it cited. **The client replaces the streamed text with `final.refusal`, exactly like `refused_uncited`.** `citations` is `[]`.
   - `error`: upstream/model failure. Refunded only if no answer text was sent yet and the client did not abort (`remaining` reflects that). Show `final.refusal` or a retry.
