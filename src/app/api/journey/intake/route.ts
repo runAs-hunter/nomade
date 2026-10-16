@@ -7,8 +7,8 @@ import { getJourneyCase } from "@/lib/journey/case";
 import { getChecklist } from "@/lib/journey/checklist";
 import { activeAccountErrorResponse, withRequestId } from "@/lib/journey/http";
 import {
-  INTAKE_QUESTIONS,
   INTAKE_RULES_VERSION,
+  intakeQuestionsPayload,
   parseIntakeAnswers,
 } from "@/lib/journey/intake";
 import { loadIntake, saveIntakeLww } from "@/lib/journey/intake-store";
@@ -89,7 +89,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         rulesVersion: intake.intake?.rulesVersion ?? INTAKE_RULES_VERSION,
         completedAt: intake.intake?.completedAt ?? null,
         clientUpdatedAt: intake.intake?.clientUpdatedAt ?? null,
-        questions: INTAKE_QUESTIONS.map((q) => ({ key: q.key, options: [...q.options] })),
+        questions: intakeQuestionsPayload(),
         requestId: ctx.requestId,
       },
       200,

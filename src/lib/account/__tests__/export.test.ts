@@ -263,7 +263,7 @@ describe("loadAccountExport", () => {
       journeyIntake: [
         {
           case_id: caseId,
-          answers: { incomeSource: "freelancer", family: "spouse" },
+          answers: { incomeSource: "freelancer", family: "spouse_children", childrenCount: 2 },
           rules_version: "f11-rules-2026-10-16",
           completed_at: null,
           client_updated_at: "2026-09-12T00:00:00.000Z",
@@ -295,7 +295,7 @@ describe("loadAccountExport", () => {
         ],
         // F11a: journey[].intake (no client_updated_at in the export).
         intake: {
-          answers: { incomeSource: "freelancer", family: "spouse" },
+          answers: { incomeSource: "freelancer", family: "spouse_children", childrenCount: 2 },
           rulesVersion: "f11-rules-2026-10-16",
           completedAt: null,
           updatedAt: "2026-09-12T00:00:01.000Z",

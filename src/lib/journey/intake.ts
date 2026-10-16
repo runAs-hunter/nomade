@@ -22,6 +22,35 @@ export const INTAKE_QUESTIONS = [
   { key: "arrivalMonth", options: [] as string[] },
 ] as const;
 
+/**
+ * F11a v2: optional follow-up fields. Not questions: they never count toward
+ * completion. `childrenCount` is an integer 1–10 (10 = "10 or more"), kept only
+ * when `family` includes children. Advertised on GET so clients feature-gate it.
+ */
+export const CHILDREN_COUNT_MIN = 1;
+export const CHILDREN_COUNT_MAX = 10;
+export const CHILDREN_COUNT_SHOW_WHEN = ["spouse_children", "children"] as const;
+export const INTAKE_FOLLOW_UPS = {
+  family: [
+    {
+      key: "childrenCount",
+      min: CHILDREN_COUNT_MIN,
+      max: CHILDREN_COUNT_MAX,
+      showWhen: [...CHILDREN_COUNT_SHOW_WHEN] as string[],
+    },
+  ],
+} as const;
+
+/** Questions as served on GET /api/journey/intake (with `followUps` where present). */
+export function intakeQuestionsPayload() {
+  return INTAKE_QUESTIONS.map((q) => {
+    const followUps = (INTAKE_FOLLOW_UPS as Record<string, readonly unknown[]>)[q.key];
+    return followUps
+      ? { key: q.key, options: [...q.options], followUps: followUps.map((f) => ({ ...(f as object) })) }
+      : { key: q.key, options: [...q.options] };
+  });
+}
+
 export type IntakeKey = (typeof INTAKE_QUESTIONS)[number]["key"];
 export const INTAKE_KEYS: readonly IntakeKey[] = INTAKE_QUESTIONS.map((q) => q.key);
 
@@ -32,6 +61,8 @@ export type IntakeAnswers = {
   housing?: "lease" | "own" | "not_yet" | "unsure";
   family?: "solo" | "spouse" | "spouse_children" | "children" | "unsure";
   arrivalMonth?: string | null;
+  /** Follow-up of `family` (spouse_children | children only). 1–10; 10 = "10 or more". */
+  childrenCount?: number;
 };
 
 export const ARRIVAL_MONTH_MAX_AHEAD = 24;
@@ -65,6 +96,18 @@ export function parseIntakeAnswers(raw: unknown, now: Date): ParseIntakeResult {
   }
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (key === "childrenCount") {
+      if (
+        typeof value !== "number" ||
+        !Number.isInteger(value) ||
+        value < CHILDREN_COUNT_MIN ||
+        value > CHILDREN_COUNT_MAX
+      ) {
+        return { ok: false, message: "childrenCount must be an integer from 1 to 10" };
+      }
+      out[key] = value;
+      continue;
+    }
     const q = INTAKE_QUESTIONS.find((x) => x.key === key);
     if (!q) return { ok: false, message: `Unknown intake key: ${key}` };
     if (key === "arrivalMonth") {
@@ -84,6 +127,13 @@ export function parseIntakeAnswers(raw: unknown, now: Date): ParseIntakeResult {
       return { ok: false, message: `Invalid value for ${key}` };
     }
     out[key] = value;
+  }
+  // Drop a stale count silently when the family answer has no children.
+  if (
+    "childrenCount" in out &&
+    !(CHILDREN_COUNT_SHOW_WHEN as readonly unknown[]).includes(out.family)
+  ) {
+    delete out.childrenCount;
   }
   return { ok: true, answers: out as IntakeAnswers };
 }
