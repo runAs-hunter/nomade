@@ -77,11 +77,11 @@ const COUNTRY: CountryData = {
           conditions: [
             {
               if: { traveling_with: "with_partner" },
-              detail: "The decree lets digital nomads and remote workers bring a spouse and minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.",
+              detail: "The decree lets digital nomads and remote workers bring a spouse aged 18 or over and unmarried minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.",
             },
             {
               if: { traveling_with: "with_family" },
-              detail: "The decree lets digital nomads and remote workers bring a spouse and minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.",
+              detail: "The decree lets digital nomads and remote workers bring a spouse aged 18 or over and unmarried minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.",
             },
           ],
         },
@@ -241,7 +241,7 @@ describe("italy.yaml dependent-permesso (Visa Ops family copy)", () => {
     const details = [...block.matchAll(/detail: "([^"]*)"/g)].slice(0, 2).map((m) => m[1]!);
     expect(details).toHaveLength(2);
     for (const d of details) {
-      expect(d).toContain("spouse and minor children (art. 29");
+      expect(d).toContain("spouse aged 18 or over and unmarried minor children (art. 29");
       expect(d).not.toMatch(/partner|before traveling|€/i);
     }
   });
