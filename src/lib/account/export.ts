@@ -72,6 +72,20 @@ export type ExportBilling = {
   events: ExportBillingEvent[];
 };
 
+/** F11b Ask: metadata only — no question/answer text exists server-side. */
+export type ExportChatUsage = { day: string; count: number };
+export type ExportChatEvent = {
+  createdAt: string;
+  outcome: string;
+  sourceIds: string[];
+  focusStepId: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number | null;
+};
+export type ExportChat = { usage: ExportChatUsage[]; events: ExportChatEvent[] };
+
 export type AccountExportEnvelope = {
   exportedAt: string;
   userId: string;
@@ -79,7 +93,7 @@ export type AccountExportEnvelope = {
   account: ExportAccount;
   identities: ExportIdentity[];
   journey: ExportJourneyCase[];
-  chat: [];
+  chat: ExportChat;
   billing: ExportBilling;
   notes: string[];
 };
@@ -113,7 +127,7 @@ export type BuildExportResult =
     };
 
 const EXPORT_NOTES = [
-  "journey filled when a case exists (F3), with intake answers per case (F11a); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
+  "journey filled when a case exists (F3), with intake answers per case (F11a); billing entitlements + transaction ids only (F3.1, no JWS); chat = Ask Nomade usage counters + metadata events only (F11b; question/answer text is never stored server-side)",
 ];
 
 /**
@@ -125,6 +139,7 @@ export function buildExportEnvelope(args: {
   identities: ExportIdentityRow[];
   journey?: ExportJourneyCase[];
   billing?: ExportBilling;
+  chat?: ExportChat;
   exportedAt?: string;
 }): AccountExportEnvelope {
   const { user, identities } = args;
@@ -159,7 +174,7 @@ export function buildExportEnvelope(args: {
       closedAt: row.closed_at,
     })),
     journey,
-    chat: [],
+    chat: args.chat ?? { usage: [], events: [] },
     billing,
     notes: [...EXPORT_NOTES],
   };
@@ -333,6 +348,11 @@ export async function loadAccountExport(
     return { ok: false, code: "DB_ERROR", message: billingRes.message };
   }
 
+  const chatRes = await loadChatForExport(service, userId);
+  if (!chatRes.ok) {
+    return { ok: false, code: "DB_ERROR", message: chatRes.message };
+  }
+
   return {
     ok: true,
     envelope: buildExportEnvelope({
@@ -349,7 +369,55 @@ export async function loadAccountExport(
         })),
         events: billingRes.events,
       },
+      chat: chatRes.chat,
       exportedAt,
     }),
+  };
+}
+
+/** F11b: Ask usage + events for export (user-scoped, metadata only). */
+export async function loadChatForExport(
+  service: AccountDbClient,
+  userId: string,
+): Promise<{ ok: true; chat: ExportChat } | { ok: false; message: string }> {
+  const db = service.schema("internal");
+  const usageRes = await db
+    .from("ask_usage")
+    .select("day, count")
+    .eq("user_id", userId)
+    .order("day", { ascending: true });
+  if (usageRes.error) return { ok: false, message: "Failed to read ask usage" };
+  const eventsRes = await db
+    .from("ask_events")
+    .select("created_at, outcome, source_ids, focus_step_id, model, input_tokens, output_tokens, latency_ms")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  if (eventsRes.error) return { ok: false, message: "Failed to read ask events" };
+  type U = { day: string; count: number };
+  type E = {
+    created_at: string;
+    outcome: string;
+    source_ids: string[] | null;
+    focus_step_id: string | null;
+    model: string | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    latency_ms: number | null;
+  };
+  return {
+    ok: true,
+    chat: {
+      usage: ((usageRes.data as U[] | null) ?? []).map((u) => ({ day: u.day, count: u.count })),
+      events: ((eventsRes.data as E[] | null) ?? []).map((e) => ({
+        createdAt: e.created_at,
+        outcome: e.outcome,
+        sourceIds: e.source_ids ?? [],
+        focusStepId: e.focus_step_id,
+        model: e.model,
+        inputTokens: e.input_tokens,
+        outputTokens: e.output_tokens,
+        latencyMs: e.latency_ms,
+      })),
+    },
   };
 }

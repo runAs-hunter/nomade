@@ -115,15 +115,3 @@ phases:
         name: Register at Anagrafe (civil registry)
         detail: "Register your residential address at your local Comune. Required for residency rights. Bring passport, visa, Permesso di Soggiorno receipt, and lease agreement."
         time: "Within 20 days of establishing residence"
-
-      - id: dependent-permesso
-        name: Apply for dependent family Permesso di Soggiorno
-        hidden_unless_matched: true
-        tags: [personalized, important]
-        conditions:
-          - if:
-              traveling_with: with_partner
-            detail: "Your partner needs their own Permesso di Soggiorno as a family member (familiare al seguito). Additional income requirement: €8,400/yr per dependent. Your partner must have traveled to Italy on a family reunion visa — apply at the consulate before traveling."
-          - if:
-              traveling_with: with_family
-            detail: "Each family member (partner + children) needs their own Permesso di Soggiorno. Additional income requirements: €8,400/yr per dependent adult + €2,800/yr per minor child. Apply for family reunion visas at the consulate for all family members before traveling."

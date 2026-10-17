@@ -73,5 +73,10 @@ iOS and browser clients receive **anon/publishable** only. Service role stays on
 | `APP_STORE_ALLOW_SANDBOX` | Optional | `true` accepts `Sandbox`/`Xcode` transactions. Set `true` on Preview **and** Production (App Review buys in Sandbox). Every event records `environment`. |
 | `BILLING_GATE_ENABLED` | Optional (default **off**) | `true` enforces the paid gate (PATCH 403 + sync rejects). Off: no gate, full details; checklist still carries `access` + `entitlement`; `entitlement.gateEnabled` mirrors this flag so clients lock only when it is on. Turn on only when the iOS paywall ships. |
 | `INTAKE_ENABLED` | Optional (default **off**) | F11a. `true` serves `GET/PUT /api/journey/intake`, accepts sync `kind: "intake"` ops, and applies intake rules in the checklist (`intake`, `flags`, per-step `notes`/`origin`, conditional family steps). Off: intake routes → 404 `INTAKE_DISABLED`, sync intake ops rejected `INTAKE_DISABLED`, checklist identical to F10. Export always includes stored answers. **Preview = `true`, Production = off** until Isaias flips it. |
+| `ASK_ENABLED` | Optional (default **off**) | F11b kill switch. `true` serves `POST /api/ask`. Off → `503 ASK_DISABLED` (after auth). `GET /api/ask/usage` always answers and reports `enabled`. **Preview = `true`, Production = off** until Isaias flips it after the eval. |
+| `ASK_MODEL` | Optional | AI Gateway model id. Default `anthropic/claude-sonnet-4.5`. |
+| `ASK_FALLBACK_MODEL` | Optional | Gateway fallback model. Default `anthropic/claude-haiku-4.5`; `none` disables. |
+| `AI_GATEWAY_API_KEY` | Optional (secret, Keeper → Vercel) | Vercel AI Gateway key, read by the AI SDK. Not needed on deployments where Vercel OIDC auth to the Gateway works. Never in git/chat/logs. |
+| `ASK_FREE_DAILY` / `ASK_PAID_DAILY` | Optional | Questions per user per UTC day when `BILLING_GATE_ENABLED=true` (free / `journey_full`). Defaults 3 / 30. Gate off → 10 for everyone. |
 
 See [`billing.md`](./billing.md). ASSN V2 deferred to F10b.
