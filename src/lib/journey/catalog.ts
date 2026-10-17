@@ -71,8 +71,60 @@ export type JourneyStepSummaries = {
   byPath?: Readonly<Partial<Record<JourneyPathId, Readonly<Record<string, string>>>>>;
 };
 
-/** Empty until Visa Ops delivers copy (Cap review). Keys are step ids. */
-export const JOURNEY_STEP_SUMMARIES: JourneyStepSummaries = { all: {} };
+/**
+ * Visa Ops step summaries (Cap-reviewed, approved 17 Oct 2026). Byte-exact
+ * copy of `__tests__/fixtures/step-summaries.md`; the test enforces it.
+ */
+export const JOURNEY_STEP_SUMMARIES: JourneyStepSummaries = {
+  all: {
+    "passport":
+      "Valid passport; most US posts ask 15+ months past travel and 2 blank pages",
+    "highly-qualified":
+      "Prove art. 27-quater status: 3-year degree, regulated license, or 5 years' experience",
+    "prior-experience":
+      "Show at least 6 months in this work, such as tax returns or client invoices",
+    "financial-statements":
+      "Back up income with pay stubs, a tax return, a W-2, or 3 recent bank statements",
+    "health-insurance":
+      "Get medical and hospital cover valid in Italy for the whole stay; posts want €30,000+",
+    "accommodation":
+      "Secure a lease or deed in your name for the whole visa; New York refuses hotel stays",
+    "criminal-record":
+      "Get a police certificate only if your post asks; it is not on the decree or checklists",
+    "family-documents":
+      "Ask your consulate and Questura what family documents to bring for spouse or children",
+    "cover-letter":
+      "Write a factual cover letter only if your post asks; the decree does not require one",
+    "consulate-appointment":
+      "Book at your residence's consulate through its booking page; Washington wants an email first",
+    "submit-application":
+      "Attend in person with originals; don't book travel on an assumed decision date",
+    "visa-fee":
+      "Pay the non-refundable type D national visa fee; amounts change each quarter",
+    "permesso-soggiorno":
+      "Request your permesso at the Questura within 8 working days of entry",
+    "family-permesso":
+      "Ask the Questura about a family permesso, which lasts as long as yours",
+    "codice-fiscale":
+      "Get your codice fiscale from the Questura when your permesso is issued",
+    "anagrafe":
+      "Register residence at your Comune once you hold a regular permesso",
+  },
+  byPath: {
+    italy_digital_nomad: {
+      "proof-of-income":
+        "Show lawful income of 3x the healthcare-ticket exemption; confirm figure with your post",
+      "partita-iva":
+        "Request a partita IVA after your codice fiscale; the decree sets no deadline",
+    },
+    italy_remote_worker: {
+      "proof-of-income":
+        "Show salary at the Italian collective-agreement level, not below the ISTAT median",
+      "employment-contract":
+        "Bring your employment contract or binding offer for highly qualified work",
+    },
+  },
+};
 
 /** Max summary length the app is designed for (one line, Dynamic Type wraps). */
 export const JOURNEY_STEP_SUMMARY_MAX = 100;
