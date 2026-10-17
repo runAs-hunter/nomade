@@ -56,10 +56,10 @@ describe("buildExportEnvelope", () => {
         },
       ],
       journey: [],
-      chat: [],
+      chat: { usage: [], events: [] },
       billing: { entitlements: [], events: [] },
       notes: [
-        "journey filled when a case exists (F3), with intake answers per case (F11a); billing entitlements + transaction ids only (F3.1, no JWS); chat empty until that domain ships",
+        "journey filled when a case exists (F3), with intake answers per case (F11a); billing entitlements + transaction ids only (F3.1, no JWS); chat = Ask Nomade usage counters + metadata events only (F11b; question/answer text is never stored server-side)",
       ],
     });
   });
@@ -92,6 +92,8 @@ function makeExportService(state: {
   journeyCases?: FakeRow[];
   journeySteps?: FakeRow[];
   journeyIntake?: FakeRow[];
+  askUsage?: FakeRow[];
+  askEvents?: FakeRow[];
 }) {
   const journeyCases = state.journeyCases ?? [];
   const journeySteps = state.journeySteps ?? [];
@@ -112,6 +114,8 @@ function makeExportService(state: {
             if (table === "journey_intake") return state.journeyIntake ?? [];
             if (table === "entitlements") return [];
             if (table === "billing_events") return [];
+            if (table === "ask_usage") return state.askUsage ?? [];
+            if (table === "ask_events") return state.askEvents ?? [];
             return [];
           };
           api.select = () => self;
@@ -207,7 +211,7 @@ describe("loadAccountExport", () => {
     expect(res.envelope.identities).toHaveLength(1);
     expect(res.envelope.identities[0].providerSubject).toBe("apple.sub.001");
     expect(res.envelope.journey).toEqual([]);
-    expect(res.envelope.chat).toEqual([]);
+    expect(res.envelope.chat).toEqual({ usage: [], events: [] });
     expect(res.envelope.billing).toEqual({ entitlements: [], events: [] });
     // IDOR: other user's identity must not appear
     expect(
@@ -302,5 +306,48 @@ describe("loadAccountExport", () => {
         },
       },
     ]);
+  });
+
+  it("F11b: chat = this user's ask usage + metadata events (no text)", async () => {
+    const service = makeExportService({
+      users: [activeUser()],
+      identities: [],
+      askUsage: [
+        { user_id: USER_ID, day: "2026-10-16", count: 2 },
+        { user_id: OTHER_ID, day: "2026-10-16", count: 9 },
+      ],
+      askEvents: [
+        {
+          user_id: USER_ID,
+          created_at: "2026-10-16T10:00:00.000Z",
+          outcome: "answered",
+          source_ids: ["us-new-york-dnv"],
+          focus_step_id: "accommodation",
+          model: "anthropic/claude-sonnet-4.5",
+          input_tokens: 900,
+          output_tokens: 120,
+          latency_ms: 2100,
+        },
+        { user_id: OTHER_ID, created_at: "2026-10-16T10:00:00.000Z", outcome: "error", source_ids: [] },
+      ],
+    });
+    const res = await loadAccountExport(service, USER_ID, EXPORTED_AT);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.envelope.chat).toEqual({
+      usage: [{ day: "2026-10-16", count: 2 }],
+      events: [
+        {
+          createdAt: "2026-10-16T10:00:00.000Z",
+          outcome: "answered",
+          sourceIds: ["us-new-york-dnv"],
+          focusStepId: "accommodation",
+          model: "anthropic/claude-sonnet-4.5",
+          inputTokens: 900,
+          outputTokens: 120,
+          latencyMs: 2100,
+        },
+      ],
+    });
   });
 });

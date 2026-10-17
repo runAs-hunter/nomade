@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runPurgeBatch } from "@/lib/account/purge";
+import { pruneAsk, runPurgeBatch } from "@/lib/account/purge";
 import { ERROR_CODES, jsonError } from "@/lib/api-error";
 import {
   cronAuthorizationMatches,
@@ -60,9 +60,12 @@ async function handle(request: Request): Promise<NextResponse> {
   }
 
   let batch;
+  let askPrune = { ok: false, pruned: 0 };
   try {
     const service = createServiceClient();
     batch = await runPurgeBatch(service);
+    // F11b retention (F0.2): ask_events 90 days. Never fails the purge run.
+    askPrune = await pruneAsk(service);
   } catch {
     logger.error("purge-accounts threw", {
       code: ERROR_CODES.INTERNAL_ERROR,
@@ -114,6 +117,8 @@ async function handle(request: Request): Promise<NextResponse> {
     skippedLegalHold,
     authAlreadyGone,
     failed,
+    askPruneOk: askPrune.ok,
+    askEventsPruned: askPrune.pruned,
   });
 
   return withRequestId(
