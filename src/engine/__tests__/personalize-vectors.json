@@ -55,11 +55,11 @@
             "conditions": [
               {
                 "if": { "traveling_with": "with_partner" },
-                "detail": "Your partner needs their own Permesso. Additional income: €8,400/yr per dependent."
+                "detail": "The decree lets digital nomads and remote workers bring a spouse aged 18 or over and unmarried minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare."
               },
               {
                 "if": { "traveling_with": "with_family" },
-                "detail": "Each family member needs their own Permesso. Additional income: €8,400/yr per adult + €2,800/yr per child."
+                "detail": "The decree lets digital nomads and remote workers bring a spouse aged 18 or over and unmarried minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare."
               }
             ]
           }
@@ -113,16 +113,16 @@
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_partner" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["€8,400"] }
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["sponsorship starts in Italy at the Questura"] }
         ]
       }
     },
     {
-      "name": "profile 6 — US freelancer with family: dependent family task with child amounts",
+      "name": "profile 6 — US freelancer with family: dependent family task",
       "profile": { "nationality": "US", "nationality_group": "non-EU", "residence": "United States", "income_type": "freelancer", "income_range": "50k_to_100k", "traveling_with": "with_family" },
       "expect": {
         "tasks": [
-          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["€2,800"] }
+          { "id": "dependent-permesso", "present": true, "isPersonalized": true, "detailContains": ["Ask your consulate and that Questura"] }
         ]
       }
     },
