@@ -106,6 +106,12 @@ Runbook: F9 "Checklist cites official sources". Additive fields; older clients i
 - Checklist GET: `access` per phase/step + `entitlement.journeyFull`. Locked steps return title + `sources`, `detail: ""`. Disclaimer unchanged.
 - Export/purge include billing — see [`billing.md`](./billing.md).
 
+## Task card v2 — step `summary` (optional)
+
+- Checklist steps may carry `summary` (string, one line, ≤ 100 chars): a Visa Ops action phrase cited by the same sources as `detail`. Copy lives in `JOURNEY_STEP_SUMMARIES` in `catalog.ts` (`all` by step id, `byPath` overrides). It ships **empty**; Visa Ops writes it and Cap reviews.
+- The key is **omitted** when there is no copy (blank strings count as absent) and on locked steps (same rule as `detail`). Clients show no summary line then, and never derive one from `detail`.
+- `detail`, `catalogVersion` and the disclaimer are unchanged.
+
 ## F11a — Intake → rules (`INTAKE_ENABLED`, default off)
 
 - Storage: `internal.journey_intake (case_id PK → journey_cases(id) on delete cascade)`. A path change updates `journey_cases.path_id` in place, so answers survive it; account purge deletes the case and the intake cascades.
