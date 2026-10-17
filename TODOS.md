@@ -18,6 +18,7 @@
 **Cons:** Requires reading Italian government sources; may require translation.
 **Context:** Figures appear in the italy.yaml `dependent-permesso` task conditions. Source them from Ministero degli Affari Esteri / INPS guidance on family reunification income thresholds for digital nomad visa applicants. Link to primary sources in the YAML `sources` field.
 **Depends on:** Nothing — can be done before any code is written.
+**Status (2026-10-17):** Figures removed, then the `dependent-permesso` step was retired (F11a catalog `family-documents` / `family-permesso` replace it). Visa Ops found no official source for €8,400 / €2,800 (art. 29 c.3 uses a different formula). Any future income line needs Visa Ops copy citing `it-normattiva-dlgs-286-1998-art29` + a dated INPS row.
 **Blocking:** Yes — these numbers must be verified before launch.
 **Owner:** Isaiah
 

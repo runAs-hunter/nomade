@@ -19,7 +19,9 @@ import { personalize } from "../personalize";
 import type { CountryData, UserProfile } from "@/data/schema";
 
 // ─── Minimal country fixture ───────────────────────────────────────────────
-// Uses a subset of the full italy.yaml to keep tests readable.
+// Synthetic fixture modelled on italy.yaml. `example-conditional-step` exercises
+// hidden_unless_matched; the real dependent-permesso step was retired (family
+// steps now live in the F11a catalog: family-documents, family-permesso).
 // Focus: conditions that vary across profiles.
 
 const COUNTRY: CountryData = {
@@ -70,18 +72,18 @@ const COUNTRY: CountryData = {
           ],
         },
         {
-          id: "dependent-permesso",
+          id: "example-conditional-step",
           name: "Apply for dependent family Permesso di Soggiorno",
           hidden_unless_matched: true,
           tags: ["personalized"],
           conditions: [
             {
               if: { traveling_with: "with_partner" },
-              detail: "Your partner needs their own Permesso. Additional income: €8,400/yr per dependent.",
+              detail: "The decree lets digital nomads and remote workers bring a spouse aged 18 or over and unmarried minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.",
             },
             {
               if: { traveling_with: "with_family" },
-              detail: "Each family member needs their own Permesso. Additional income: €8,400/yr per adult + €2,800/yr per child.",
+              detail: "The decree lets digital nomads and remote workers bring a spouse aged 18 or over and unmarried minor children (art. 29, comma 1, letters a and b, of the Testo unico), under that article's conditions. US posts say the sponsorship starts in Italy at the Questura where you applied for your permesso. They also say that, at the time of their 2024 writing, children over 18 and parents could not be sponsored. No official page we checked lists the family documents. Ask your consulate and that Questura what to prepare.",
             },
           ],
         },
@@ -114,8 +116,8 @@ describe("personalize()", () => {
     expect(incomeTask?.detail).toContain("apostille");
     expect(incomeTask?.isPersonalized).toBe(true);
     // Dependent permesso should be excluded (solo, hidden_unless_matched)
-    const dependentTask = result.phases[0].tasks.find((t) => t.id === "dependent-permesso");
-    expect(dependentTask).toBeUndefined();
+    const conditionalTask = result.phases[0].tasks.find((t) => t.id === "example-conditional-step");
+    expect(conditionalTask).toBeUndefined();
     expect(result.incomeWarning).toBe(false);
   });
 
@@ -125,8 +127,8 @@ describe("personalize()", () => {
     const incomeTask = result.phases[0].tasks.find((t) => t.id === "proof-of-income");
     expect(incomeTask?.detail).toContain("pay stubs");
     expect(incomeTask?.isPersonalized).toBe(true);
-    const dependentTask = result.phases[0].tasks.find((t) => t.id === "dependent-permesso");
-    expect(dependentTask).toBeUndefined();
+    const conditionalTask = result.phases[0].tasks.find((t) => t.id === "example-conditional-step");
+    expect(conditionalTask).toBeUndefined();
   });
 
   // Profile 3: EU freelancer solo
@@ -150,19 +152,21 @@ describe("personalize()", () => {
   // Profile 5: US freelancer with partner
   it("profile 5 — US freelancer with partner: shows dependent partner task", () => {
     const result = personalize(COUNTRY, profile({ income_type: "freelancer", traveling_with: "with_partner" }));
-    const dependentTask = result.phases[0].tasks.find((t) => t.id === "dependent-permesso");
-    expect(dependentTask).toBeDefined();
-    expect(dependentTask?.detail).toContain("€8,400");
-    expect(dependentTask?.isPersonalized).toBe(true);
+    const conditionalTask = result.phases[0].tasks.find((t) => t.id === "example-conditional-step");
+    expect(conditionalTask).toBeDefined();
+    expect(conditionalTask?.detail).toContain("sponsorship starts in Italy at the Questura");
+    expect(conditionalTask?.detail).not.toMatch(/€|8,400|2,800|before traveling|partner/i);
+    expect(conditionalTask?.isPersonalized).toBe(true);
   });
 
   // Profile 6: US freelancer with family
-  it("profile 6 — US freelancer with family: shows dependent family task with child amounts", () => {
+  it("profile 6 — US freelancer with family: shows dependent family task", () => {
     const result = personalize(COUNTRY, profile({ income_type: "freelancer", traveling_with: "with_family" }));
-    const dependentTask = result.phases[0].tasks.find((t) => t.id === "dependent-permesso");
-    expect(dependentTask).toBeDefined();
-    expect(dependentTask?.detail).toContain("€2,800");
-    expect(dependentTask?.isPersonalized).toBe(true);
+    const conditionalTask = result.phases[0].tasks.find((t) => t.id === "example-conditional-step");
+    expect(conditionalTask).toBeDefined();
+    expect(conditionalTask?.detail).toContain("Ask your consulate and that Questura");
+    expect(conditionalTask?.detail).not.toMatch(/€|8,400|2,800|before traveling|partner/i);
+    expect(conditionalTask?.isPersonalized).toBe(true);
   });
 
   // Profile 7: US mixed income solo
@@ -194,7 +198,7 @@ describe("personalize()", () => {
   it("profile 10 — solo traveler: hidden_unless_matched dependent task is excluded", () => {
     const result = personalize(COUNTRY, profile({ traveling_with: "solo" }));
     const allTaskIds = result.phases.flatMap((p) => p.tasks.map((t) => t.id));
-    expect(allTaskIds).not.toContain("dependent-permesso");
+    expect(allTaskIds).not.toContain("example-conditional-step");
   });
 
   // ─── Count and structure checks ───────────────────────────────────────────
@@ -227,5 +231,15 @@ describe("personalize()", () => {
     const nonEuTask = nonEuResult.phases[0].tasks.find((t) => t.id === "proof-of-income");
     expect(nonEuTask?.detail).toContain("apostille");
     expect(euTask?.detail).not.toContain("apostille");
+  });
+});
+
+describe("italy.yaml retired dependent-permesso", () => {
+  it("is gone; family steps live in the F11a catalog (family-documents, family-permesso)", async () => {
+    const { readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const yaml = readFileSync(join(__dirname, "../../data/countries/italy.yaml"), "utf-8");
+    expect(yaml).not.toContain("dependent-permesso");
+    expect(yaml).not.toMatch(/8,400|2,800|family reunion visa/);
   });
 });

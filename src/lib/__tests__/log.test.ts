@@ -92,3 +92,22 @@ describe("log", () => {
     expect(line.path).toBe("/api/health");
   });
 });
+
+describe("F11b redaction: Ask text keys", () => {
+  it("redacts question/answer/prompt/system/text/messages/content even if a caller passes them", () => {
+    const out = redact({
+      question: "Zebracorn?",
+      answer: "Quokka",
+      prompt: "p",
+      system: "s",
+      text: "t",
+      messages: [{ role: "user", content: "hi" }],
+      nested: { content: "c" },
+      outcome: "answered",
+      sourceIds: ["us-new-york-dnv"],
+    }) as Record<string, unknown>;
+    expect(JSON.stringify(out)).not.toMatch(/Zebracorn|Quokka|"hi"/);
+    expect(out.outcome).toBe("answered");
+    expect(out.sourceIds).toEqual(["us-new-york-dnv"]);
+  });
+});

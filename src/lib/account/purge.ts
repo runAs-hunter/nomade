@@ -97,10 +97,37 @@ export async function wipeJourney(
   return { wiped: rows.length };
 }
 
-/** Chat wipe stub — no-op until user-bound chat tables exist. */
-export async function wipeChat(userId: string): Promise<WipeResult> {
-  void userId;
-  return { wiped: 0 };
+/**
+ * F11b chat wipe: Ask usage counters + metadata events (no text exists
+ * server-side; threads are device-local). Returns deleted event count.
+ */
+export async function wipeChat(
+  service: AccountDbClient,
+  userId: string,
+): Promise<WipeResult> {
+  const db = service.schema("internal");
+  const usage = await db.from("ask_usage").delete().eq("user_id", userId);
+  if (usage.error) {
+    log.error("purge ask_usage delete failed", { userId, code: "DB_ERROR" });
+  }
+  const events = await db.from("ask_events").delete().eq("user_id", userId).select("id");
+  if (events.error) {
+    log.error("purge ask_events delete failed", { userId, code: "DB_ERROR" });
+    return { wiped: 0 };
+  }
+  const rows = (events.data as { id: string }[] | null) ?? [];
+  return { wiped: rows.length };
+}
+
+/** F11b retention: ask_events > 90 days, ask_usage > 7 days. Best effort. */
+export async function pruneAsk(service: AccountDbClient): Promise<{ ok: boolean; pruned: number }> {
+  try {
+    const res = await service.schema("internal").rpc("ask_prune", {});
+    if (res.error) return { ok: false, pruned: 0 };
+    return { ok: true, pruned: typeof res.data === "number" ? res.data : 0 };
+  } catch {
+    return { ok: false, pruned: 0 };
+  }
 }
 
 /**
@@ -268,9 +295,9 @@ export async function purgeAccount(
     return { userId, outcome: "failed", failCode: "DELETE_IDENTITIES" };
   }
 
-  // 3. Domain wipes — journey (F3); billing (F3.1); chat stub
+  // 3. Domain wipes — journey (F3); billing (F3.1); chat (F11b Ask metadata)
   await wipeJourney(service, userId);
-  await wipeChat(userId);
+  await wipeChat(service, userId);
   await wipeBilling(service, userId);
 
   // 4. Auth admin deleteUser — missing user = success

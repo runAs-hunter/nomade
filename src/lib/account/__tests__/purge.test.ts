@@ -28,8 +28,26 @@ function makePurgeService(state: {
   journeyCases?: FakeRow[];
   entitlements?: FakeRow[];
   billingEvents?: FakeRow[];
+  askUsage?: FakeRow[];
+  askEvents?: FakeRow[];
   deleteUser?: ReturnType<typeof vi.fn>;
 }) {
+  if (!state.askUsage) state.askUsage = [];
+  if (!state.askEvents) state.askEvents = [];
+  const rowsFor = (table: string): FakeRow[] =>
+    table === "users"
+      ? state.users
+      : table === "auth_identities"
+        ? state.identities
+        : table === "entitlements"
+          ? (state.entitlements ?? [])
+          : table === "billing_events"
+            ? (state.billingEvents ?? [])
+            : table === "ask_usage"
+              ? state.askUsage!
+              : table === "ask_events"
+                ? state.askEvents!
+                : (state.journeyCases ?? []);
   if (!state.journeyCases) state.journeyCases = [];
   if (!state.entitlements) state.entitlements = [];
   if (!state.billingEvents) state.billingEvents = [];
@@ -97,15 +115,7 @@ function makePurgeService(state: {
           };
           api.maybeSingle = async () => {
             const rows =
-              table === "users"
-                ? state.users
-                : table === "auth_identities"
-                  ? state.identities
-                  : table === "entitlements"
-                    ? (state.entitlements ?? [])
-                    : table === "billing_events"
-                      ? (state.billingEvents ?? [])
-                      : (state.journeyCases ?? []);
+              rowsFor(table);
             const match = rows.find((r) => matches(r));
             return { data: match ?? null, error: null };
           };
@@ -122,15 +132,7 @@ function makePurgeService(state: {
             resolve: (v: { data: unknown; error: null }) => unknown,
           ) => {
             const rows =
-              table === "users"
-                ? state.users
-                : table === "auth_identities"
-                  ? state.identities
-                  : table === "entitlements"
-                    ? (state.entitlements ?? [])
-                    : table === "billing_events"
-                      ? (state.billingEvents ?? [])
-                      : (state.journeyCases ?? []);
+              rowsFor(table);
             if (pendingUpdate) {
               for (const r of rows) {
                 if (matches(r)) Object.assign(r, pendingUpdate);
@@ -161,6 +163,10 @@ function makePurgeService(state: {
                 ents.length = 0;
                 ents.push(...keep);
                 state.entitlements = ents;
+              } else if (table === "ask_usage" || table === "ask_events") {
+                const list = rowsFor(table);
+                list.length = 0;
+                list.push(...keep);
               }
               pendingDelete = false;
               return Promise.resolve(resolve({ data: removed, error: null }));
@@ -229,11 +235,34 @@ describe("purge constants / stubs", () => {
     const service = makePurgeService(state);
     expect(await wipeJourney(service, USER_ID)).toEqual({ wiped: 1 });
     expect(state.journeyCases.map((c) => c.id)).toEqual(["case-2"]);
-    expect(await wipeChat(USER_ID)).toEqual({ wiped: 0 });
+    expect(await wipeChat(service, USER_ID)).toEqual({ wiped: 0 });
     expect(await wipeBilling(service, USER_ID)).toEqual({ wiped: 1 });
     expect(state.entitlements.map((e) => e.user_id)).toEqual([OTHER_ID]);
     expect(state.billingEvents[0]?.raw_ref).toBeNull();
     expect(state.billingEvents).toHaveLength(1);
+  });
+
+  it("F11b wipeChat deletes only this user's ask_usage + ask_events", async () => {
+    const state = {
+      users: [],
+      identities: [],
+      journeyCases: [{ id: "case-1", user_id: USER_ID, path_id: "italy_digital_nomad" }],
+      askUsage: [
+        { user_id: USER_ID, day: "2026-10-16", count: 2 },
+        { user_id: OTHER_ID, day: "2026-10-16", count: 1 },
+      ],
+      askEvents: [
+        { id: "e1", user_id: USER_ID, outcome: "answered" },
+        { id: "e2", user_id: USER_ID, outcome: "refused_no_source" },
+        { id: "e3", user_id: OTHER_ID, outcome: "answered" },
+      ],
+    };
+    const service = makePurgeService(state);
+    expect(await wipeChat(service, USER_ID)).toEqual({ wiped: 2 });
+    expect(state.askUsage.map((r) => r.user_id)).toEqual([OTHER_ID]);
+    expect(state.askEvents.map((r) => r.id)).toEqual(["e3"]);
+    // Never touches journey rows.
+    expect(state.journeyCases).toHaveLength(1);
   });
 
   it("eligibility cutoff is now - 24h", () => {

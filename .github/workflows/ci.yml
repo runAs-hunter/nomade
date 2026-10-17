@@ -78,3 +78,7 @@ jobs:
         run: supabase start
       - name: Reset database (apply migrations + seed)
         run: supabase db reset
+      - name: F11b ask_consume concurrency (local stack only)
+        run: |
+          command -v psql >/dev/null || (sudo apt-get update -q && sudo apt-get install -y -q postgresql-client)
+          bash scripts/ci/f11b-ask-consume-concurrency.sh
