@@ -56,6 +56,17 @@ export const serverEnvSchema = z
     BILLING_GATE_ENABLED: z.enum(["true", "false"]).optional(),
     /** F11a intake flag. "true" serves /api/journey/intake + applies rules. Default OFF. */
     INTAKE_ENABLED: z.enum(["true", "false"]).optional(),
+    /** F11b Ask kill switch. "true" serves POST /api/ask. Default OFF. */
+    ASK_ENABLED: z.enum(["true", "false"]).optional(),
+    /** F11b AI Gateway model id (default anthropic/claude-sonnet-4.5). */
+    ASK_MODEL: z.string().trim().min(1).optional(),
+    /** F11b gateway fallback model id (default anthropic/claude-haiku-4.5; "none" disables). */
+    ASK_FALLBACK_MODEL: z.string().trim().min(1).optional(),
+    /** F11b Vercel AI Gateway key (Keeper → Vercel). Optional when Vercel OIDC is used. */
+    AI_GATEWAY_API_KEY: z.string().trim().min(1).optional(),
+    /** F11b daily question limits (positive ints). Defaults 3 / 30. */
+    ASK_FREE_DAILY: z.string().trim().regex(/^[0-9]+$/).optional(),
+    ASK_PAID_DAILY: z.string().trim().regex(/^[0-9]+$/).optional(),
   })
   .superRefine((data, ctx) => {
     if (looksLikeServiceRoleJwt(data.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
@@ -130,6 +141,12 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     APP_STORE_ALLOW_SANDBOX: source.APP_STORE_ALLOW_SANDBOX || undefined,
     BILLING_GATE_ENABLED: source.BILLING_GATE_ENABLED || undefined,
     INTAKE_ENABLED: source.INTAKE_ENABLED || undefined,
+    ASK_ENABLED: source.ASK_ENABLED || undefined,
+    ASK_MODEL: source.ASK_MODEL || undefined,
+    ASK_FALLBACK_MODEL: source.ASK_FALLBACK_MODEL || undefined,
+    AI_GATEWAY_API_KEY: source.AI_GATEWAY_API_KEY || undefined,
+    ASK_FREE_DAILY: source.ASK_FREE_DAILY || undefined,
+    ASK_PAID_DAILY: source.ASK_PAID_DAILY || undefined,
   });
 
   if (!result.success) {
@@ -318,4 +335,43 @@ export function isBillingGateEnabled(source: EnvSource = process.env): boolean {
  */
 export function isIntakeEnabled(source: EnvSource = process.env): boolean {
   return optionalTrimmed(source.INTAKE_ENABLED) === "true";
+}
+
+export const ASK_DEFAULT_MODEL = "anthropic/claude-sonnet-4.5";
+export const ASK_DEFAULT_FALLBACK_MODEL = "anthropic/claude-haiku-4.5";
+export const ASK_DEFAULT_FREE_DAILY = 3;
+export const ASK_DEFAULT_PAID_DAILY = 30;
+/** Everyone's daily limit while BILLING_GATE_ENABLED is off (Cap decision 5). */
+export const ASK_UNGATED_DAILY = 10;
+
+export type AskConfig = {
+  enabled: boolean;
+  model: string;
+  /** Empty when ASK_FALLBACK_MODEL=none. */
+  fallbackModels: string[];
+  freeDaily: number;
+  paidDaily: number;
+};
+
+function positiveIntOr(raw: string | undefined, fallback: number): number {
+  const v = optionalTrimmed(raw);
+  if (!v || !/^[0-9]+$/.test(v)) return fallback;
+  const n = Number.parseInt(v, 10);
+  return Number.isSafeInteger(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * F11b Ask config (read per request). ASK_ENABLED default OFF (kill switch).
+ * Never returns or logs AI_GATEWAY_API_KEY (the AI SDK reads it from env).
+ */
+export function getAskConfig(source: EnvSource = process.env): AskConfig {
+  const fallback = optionalTrimmed(source.ASK_FALLBACK_MODEL) ?? ASK_DEFAULT_FALLBACK_MODEL;
+  const model = optionalTrimmed(source.ASK_MODEL) ?? ASK_DEFAULT_MODEL;
+  return {
+    enabled: optionalTrimmed(source.ASK_ENABLED) === "true",
+    model,
+    fallbackModels: fallback.toLowerCase() === "none" || fallback === model ? [] : [fallback],
+    freeDaily: positiveIntOr(source.ASK_FREE_DAILY, ASK_DEFAULT_FREE_DAILY),
+    paidDaily: positiveIntOr(source.ASK_PAID_DAILY, ASK_DEFAULT_PAID_DAILY),
+  };
 }
