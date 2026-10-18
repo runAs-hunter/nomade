@@ -40,6 +40,8 @@ export type SourceRow = {
   notes: string | null;
   content_hash: string | null;
   snapshot_ref: string | null;
+  /** F12a: set by the link check on a pinned form PDF hash mismatch. */
+  needs_review?: boolean;
   step_ids: string[];
   created_at: string;
   updated_at: string;
@@ -49,7 +51,7 @@ export type SourceRow = {
 export const PUBLIC_SOURCE_COLUMNS =
   "id, path_ids, country, title, publisher, official_url, doc_type, scope, retrieved_at, last_checked_at, last_http_status, status, step_ids";
 
-export const ALL_SOURCE_COLUMNS = `${PUBLIC_SOURCE_COLUMNS}, notes, content_hash, snapshot_ref, created_at, updated_at`;
+export const ALL_SOURCE_COLUMNS = `${PUBLIC_SOURCE_COLUMNS}, notes, content_hash, snapshot_ref, needs_review, created_at, updated_at`;
 
 export type PublicSourceRow = Pick<
   SourceRow,
@@ -93,6 +95,7 @@ export type AdminSource = PublicSource & {
   notes: string | null;
   contentHash: string | null;
   snapshotRef: string | null;
+  needsReview: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -121,6 +124,7 @@ export function toAdminSource(row: SourceRow): AdminSource {
     notes: row.notes,
     contentHash: row.content_hash,
     snapshotRef: row.snapshot_ref,
+    needsReview: row.needs_review === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

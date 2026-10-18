@@ -4,6 +4,7 @@ import { cronAuthorizationMatches, getCronSecret } from "@/lib/env";
 import { withRequestId } from "@/lib/journey/http";
 import { log } from "@/lib/log";
 import { getRequestId } from "@/lib/request-id";
+import { FORM_TEMPLATE_PINS } from "@/lib/forms/registry";
 import { runSourceCheck } from "@/lib/sources/check";
 import { applyCheckUpdate, listActiveForCheck } from "@/lib/sources/repo";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -23,6 +24,7 @@ function flag(url: URL, name: string): boolean {
  * Manual trigger only — Authorization: Bearer ${CRON_SECRET} (purge-accounts
  * pattern). Intentionally NOT scheduled in vercel.json (F8 lock).
  * Query: ?dryRun=1 (probe only, no writes), ?hash=1 (GET + sha256 body).
+ * F12a: pinned form PDFs are always hashed; a mismatch sets needs_review.
  */
 async function handle(request: Request): Promise<NextResponse> {
   const requestId = getRequestId(request);
@@ -72,17 +74,19 @@ async function handle(request: Request): Promise<NextResponse> {
       {
         rows: rows.value,
         applyUpdate: (id, update) => applyCheckUpdate(service, id, update),
+        pinnedHashes: FORM_TEMPLATE_PINS,
       },
       { dryRun, hash },
     );
 
     for (const r of summary.results) {
-      if (r.outcome !== "ok") {
+      if (r.outcome !== "ok" || r.formHashMismatch) {
         logger.warn("check-sources flagged", {
           sourceId: r.id,
           outcome: r.outcome,
           httpStatus: r.httpStatus,
           action: r.action,
+          ...(r.formHashMismatch ? { formHashMismatch: true } : {}),
           dryRun,
         });
       }

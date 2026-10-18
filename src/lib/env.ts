@@ -58,6 +58,8 @@ export const serverEnvSchema = z
     INTAKE_ENABLED: z.enum(["true", "false"]).optional(),
     /** F11b Ask kill switch. "true" serves POST /api/ask. Default OFF. */
     ASK_ENABLED: z.enum(["true", "false"]).optional(),
+    /** F12a forms library. "true" serves GET /api/forms*. Default OFF (ships in 1.1). */
+    FORMS_ENABLED: z.enum(["true", "false"]).optional(),
     /** F11b AI Gateway model id (default anthropic/claude-sonnet-4.5). */
     ASK_MODEL: z.string().trim().min(1).optional(),
     /** F11b gateway fallback model id (default anthropic/claude-haiku-4.5; "none" disables). */
@@ -142,6 +144,7 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     BILLING_GATE_ENABLED: source.BILLING_GATE_ENABLED || undefined,
     INTAKE_ENABLED: source.INTAKE_ENABLED || undefined,
     ASK_ENABLED: source.ASK_ENABLED || undefined,
+    FORMS_ENABLED: source.FORMS_ENABLED || undefined,
     ASK_MODEL: source.ASK_MODEL || undefined,
     ASK_FALLBACK_MODEL: source.ASK_FALLBACK_MODEL || undefined,
     AI_GATEWAY_API_KEY: source.AI_GATEWAY_API_KEY || undefined,
@@ -335,6 +338,11 @@ export function isBillingGateEnabled(source: EnvSource = process.env): boolean {
  */
 export function isIntakeEnabled(source: EnvSource = process.env): boolean {
   return optionalTrimmed(source.INTAKE_ENABLED) === "true";
+}
+
+/** F12a forms library flag (read per request). Default OFF. */
+export function isFormsEnabled(source: EnvSource = process.env): boolean {
+  return optionalTrimmed(source.FORMS_ENABLED) === "true";
 }
 
 export const ASK_DEFAULT_MODEL = "anthropic/claude-sonnet-4.5";

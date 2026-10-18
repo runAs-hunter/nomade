@@ -11,6 +11,12 @@
  * never stales. Host changes and hash changes are flagged, not staled
  * (consulate HTML embeds per-request tokens; hashes churn).
  *
+ * F12a (decision 6): rows with a pinned form-template hash (`pinnedHashes`,
+ * from src/lib/forms/registry.ts) are ALWAYS fetched with GET and hashed. If
+ * the official PDF's sha256 differs from the pin, the row gets
+ * `needs_review = true` (sticky: only Visa Ops clears it, via admin PATCH).
+ * Status is not changed; a fetch that yields no hash changes nothing.
+ *
  * Writes operational columns only. Never scrapes behind login / Prenot@Mi
  * queues: one unauthenticated HEAD/GET of the landing URL, no cookies.
  */
@@ -199,6 +205,8 @@ export type CheckResultItem = {
   action: "none" | "mark_stale";
   hostChanged: boolean;
   hashChanged: boolean;
+  /** F12a: pinned form PDF hash differed → needs_review set. */
+  formHashMismatch?: boolean;
   networkError?: ProbeNetworkError;
   writeFailed?: boolean;
 };
@@ -215,6 +223,7 @@ export type CheckSummary = {
   errors: number;
   hostChanged: number;
   hashChanged: number;
+  formHashMismatch: number;
   writeFailures: number;
   results: CheckResultItem[];
 };
@@ -226,6 +235,8 @@ export type RunCheckDeps = {
   now?: () => Date;
   timeoutMs?: number;
   concurrency?: number;
+  /** F12a: source id → pinned sha256 hex of the official form PDF. */
+  pinnedHashes?: Readonly<Record<string, string>>;
 };
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -264,11 +275,13 @@ export async function runSourceCheck(
       return item;
     }
 
+    const pin = deps.pinnedHashes?.[row.id];
     const probe = await probeUrl(row.official_url, {
       fetchImpl: deps.fetchImpl,
       timeoutMs: deps.timeoutMs,
-      hash: opts.hash,
+      hash: opts.hash || !!pin,
     });
+    const formHashMismatch = !!pin && !!probe.contentHash && probe.contentHash !== `sha256:${pin}`;
     const cls = classifyProbe(row.official_url, probe);
     const hashChanged =
       !!probe.contentHash && !!row.content_hash && probe.contentHash !== row.content_hash;
@@ -281,6 +294,7 @@ export async function runSourceCheck(
       action: cls.markStale ? "mark_stale" : "none",
       hostChanged: cls.hostChanged,
       hashChanged,
+      ...(pin ? { formHashMismatch } : {}),
       ...(probe.networkError ? { networkError: probe.networkError } : {}),
     };
 
@@ -291,6 +305,7 @@ export async function runSourceCheck(
       };
       if (probe.contentHash) update.content_hash = probe.contentHash;
       if (cls.markStale) update.status = "stale";
+      if (formHashMismatch) update.needs_review = true;
       try {
         const res = await deps.applyUpdate(row.id, update);
         if (!res.ok) item.writeFailed = true;
@@ -314,6 +329,7 @@ export async function runSourceCheck(
     errors: count((r) => r.outcome === "error"),
     hostChanged: count((r) => r.hostChanged),
     hashChanged: count((r) => r.hashChanged),
+    formHashMismatch: count((r) => !!r.formHashMismatch),
     writeFailures: count((r) => !!r.writeFailed),
     results,
   };

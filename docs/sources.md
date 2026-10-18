@@ -25,6 +25,7 @@ Migrations: `supabase/migrations/20261008133111_f8_official_sources.sql` (table)
 | `status` | `text` | `active \| stale \| retired`. Public API returns `active` only. |
 | `notes` | `text` | Internal curation notes — **not** returned by public GETs. |
 | `content_hash` | `text` | Optional `sha256:<hex>` (refresh `?hash=1`). Change detection only. |
+| `needs_review` | `boolean` | F12a. Set `true` by the check when a pinned form PDF hash differs (see docs/forms.md). Sticky; Visa Ops clears it with admin `PATCH { "needsReview": false }` after re-verifying. |
 | `snapshot_ref` | `text` | Optional pointer to a stored snapshot (unused in F8). |
 | `step_ids` | `text[]` | Optional F5 catalog step ids (empty in seed — Visa Ops maps later). |
 | `created_at`, `updated_at` | `timestamptz` | `updated_at` via `internal.set_updated_at()`. |
@@ -105,7 +106,9 @@ Per active row (4 concurrent, 15 s timeout, `maxDuration = 60`):
    Final-URL host change (ignoring `www.`) → `hostChanged: true` flag only. Hash change → `hashChanged: true` flag only (consulate HTML churns).
 3. Non-dry-run writes **operational columns only**: `last_checked_at`, `last_http_status`, `content_hash` (hash mode), `status = 'stale'` (hard failures). Update guarded by `status = 'active'`. Never touches title / URL / notes / curation fields.
 
-Response: `200 { ok, requestId, checkedAt, dryRun, hashed, checked, healthy, botBlocked, staleFlagged, needsReview, errors, hostChanged, hashChanged, writeFailures, results: [{ id, httpStatus, method, outcome, action, hostChanged, hashChanged, networkError? }] }`. In dry-run, `staleFlagged` / `action: "mark_stale"` mean *would* stale.
+**F12a pinned forms:** rows in `FORM_TEMPLATE_PINS` (src/lib/forms/registry.ts) are always fetched with `GET` and hashed, even without `?hash=1`. A sha256 that differs from the pin sets `needs_review = true` (status unchanged) and reports `formHashMismatch: true`. No hash (404, network error) never sets it.
+
+Response: `200 { ok, requestId, checkedAt, dryRun, hashed, checked, healthy, botBlocked, staleFlagged, needsReview, errors, hostChanged, hashChanged, formHashMismatch, writeFailures, results: [{ id, httpStatus, method, outcome, action, hostChanged, hashChanged, formHashMismatch?, networkError? }] }`. In dry-run, `staleFlagged` / `action: "mark_stale"` mean *would* stale.
 
 Why a browser-like UA **and** an allowlist: `prenotami.esteri.it` answers 403 to non-browser agents (e.g. curl's default UA) and 200 to browsers (verified 2026-10-08). The UA avoids most bot 403s; the allowlist guarantees a bot 403 never stales Prenot@Mi even if the WAF tightens.
 

@@ -131,6 +131,8 @@ export const patchSourceSchema = z
     notes: curationFields.notes.optional(),
     stepIds: curationFields.stepIds.optional(),
     snapshotRef: curationFields.snapshotRef.optional(),
+    /** F12a: Visa Ops re-verified a form PDF → clear (false) the check's flag. */
+    needsReview: z.boolean().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, {
@@ -142,7 +144,7 @@ export type PatchSourceInput = z.infer<typeof patchSourceSchema>;
 
 /** Map validated camelCase input → DB column names (only provided keys). */
 export function toDbColumns(
-  input: Partial<CreateSourceInput>,
+  input: Partial<CreateSourceInput> & { needsReview?: boolean },
 ): Record<string, unknown> {
   const map: Record<string, string> = {
     id: "id",
@@ -158,6 +160,7 @@ export function toDbColumns(
     notes: "notes",
     stepIds: "step_ids",
     snapshotRef: "snapshot_ref",
+    needsReview: "needs_review",
   };
   const out: Record<string, unknown> = {};
   for (const [key, column] of Object.entries(map)) {
