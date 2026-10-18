@@ -115,6 +115,22 @@ describe("/api/cron/check-sources (F8)", () => {
     expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: false, hash: false, formsOnly: true });
   });
 
+  it("F12a R3-1: the exact vercel.json cron path runs forms-only, with or without the Vercel UA", async () => {
+    const { readFileSync } = await import("fs");
+    const vercel = JSON.parse(readFileSync(`${process.cwd()}/vercel.json`, "utf8")) as { crons: { path: string }[] };
+    const cron = vercel.crons.find((c) => c.path.startsWith("/api/cron/check-sources"))!;
+    expect(cron.path).toBe("/api/cron/check-sources?formsOnly=1");
+    listActiveForCheck.mockResolvedValue({ ok: true, value: [] });
+    runSourceCheck.mockResolvedValue({ ...SUMMARY, dryRun: false, checked: 0, results: [] });
+    const query = cron.path.slice("/api/cron/check-sources".length);
+    for (const ua of ["vercel-cron/1.0", undefined]) {
+      runSourceCheck.mockClear();
+      const res = await GET(cronReq("GET", query, `Bearer ${CRON_SECRET}`, ua));
+      expect(res.status).toBe(200);
+      expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: false, hash: false, formsOnly: true });
+    }
+  });
+
   it("F12a: ?formsOnly=1 runs forms-only; Vercel Cron UA without the secret is still 401", async () => {
     listActiveForCheck.mockResolvedValue({ ok: true, value: [] });
     runSourceCheck.mockResolvedValue({ ...SUMMARY, dryRun: false, checked: 0, results: [] });

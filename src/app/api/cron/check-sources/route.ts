@@ -25,8 +25,9 @@ function flag(url: URL, name: string): boolean {
  * F12a (Cap review of #40, 18 Oct 2026): scheduled monthly in vercel.json
  * (`0 4 1 * *` UTC, Production only) in FORMS-ONLY mode: the scheduled run
  * checks pinned form PDFs only and never auto-stales other sources (F8 kept the
- * full check manual for that reason). Forms-only applies to Vercel Cron calls
- * (user-agent `vercel-cron/…`) and to `?formsOnly=1`. A manual call without it
+ * full check manual for that reason). The cron path carries `?formsOnly=1`
+ * (Cap R3-1); the Vercel Cron user-agent (`vercel-cron/…`) is a second guard
+ * that also forces forms-only. A manual call without it
  * runs the full F8 check as before.
  * Query: ?dryRun=1 (probe only, no writes), ?hash=1 (GET + sha256 body).
  * F12a: pinned form PDFs are always hashed; a mismatch sets needs_review.

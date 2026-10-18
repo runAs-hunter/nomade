@@ -147,7 +147,7 @@ Store metadata so Chat can later emit citations: `id`, `title`, `publisher`, `of
 
 - Cap draft written: **2026-10-08** (Europe/Rome)
 - **APPROVED as written with Cap defaults: 2026-10-08** — Supabase on nomade-dev; public read of active rows; metadata in F8, Chat cite UX in F9; human monthly check + manual-trigger stub (no vercel.json cron); tag both paths where the doc covers both
-- Visa Ops seed CSV: `/workspace/F8-official-sources-seed.csv` (20 rows, Cap accepted 2026-10-08)
+- Visa Ops seed CSV: `docs/sources/F8-official-sources-seed.csv` (20 rows, Cap accepted 2026-10-08)
 - Cap seed locks: KEEP Normattiva + Polizia 225 + Gazzetta Art.1 deep-link; defer interno/AdE (bot 403); Prenot@Mi stay + refresh stub must not stale on bot 403
 - Theo briefed for schema/API/seed/refresh stub: 2026-10-08
 - Smoke target: nomade-dev / `nomade-eight.vercel.app`

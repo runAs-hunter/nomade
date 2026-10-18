@@ -175,6 +175,34 @@ describe("GET /api/forms* (F12a)", () => {
     },
   );
 
+  it("logs never record the consulate or post id (Cap R3-3)", async () => {
+    const lines: string[] = [];
+    const grab = (...args: unknown[]) => void lines.push(args.map(String).join(" "));
+    const spies = [
+      vi.spyOn(console, "log").mockImplementation(grab),
+      vi.spyOn(console, "warn").mockImplementation(grab),
+      vi.spyOn(console, "error").mockImplementation(grab),
+    ];
+    try {
+      vi.stubEnv("BILLING_GATE_ENABLED", "true");
+      for (const p of US_CONSULATE_POSTS) {
+        await getForm("national-visa", undefined, p.id);
+        await LIST(req(`/api/forms?consulate=${p.id}`));
+      }
+      await getForm("national-visa", undefined, "rome");
+      db = makeDb(seed({ source: sourceRow({ needs_review: true }) }));
+      await getForm("national-visa", undefined, "boston");
+    } finally {
+      for (const sp of spies) sp.mockRestore();
+    }
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line).not.toMatch(/consulate|postId/i);
+      for (const p of US_CONSULATE_POSTS) expect(line).not.toContain(`"${p.id}"`);
+      expect(line).not.toContain('"rome"');
+    }
+  });
+
   it("variant scope: only prefillPosts get the PDF (Cap review item 1)", async () => {
     const list = await (await LIST(req("/api/forms?consulate=new-york"))).json();
     expect(list.forms[0].variant.prefillPosts).toEqual(["new-york"]);

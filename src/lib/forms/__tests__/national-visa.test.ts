@@ -209,7 +209,7 @@ describe("F12a national visa form content", () => {
     const vercel = JSON.parse(readFileSync(path.join(ROOT, "vercel.json"), "utf8")) as {
       crons: { path: string; schedule: string }[];
     };
-    expect(vercel.crons).toContainEqual({ path: "/api/cron/check-sources", schedule: "0 4 1 * *" });
+    expect(vercel.crons).toContainEqual({ path: "/api/cron/check-sources?formsOnly=1", schedule: "0 4 1 * *" });
     expect(vercel.crons).toContainEqual({ path: "/api/cron/purge-accounts", schedule: "0 4 * * *" });
   });
 });

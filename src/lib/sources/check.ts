@@ -14,10 +14,11 @@
  * F12a (decision 6; Cap review of #40): rows with a pinned form-template hash
  * (`pinnedHashes`, from src/lib/forms/registry.ts) are ALWAYS fetched with GET
  * and hashed, and are NEVER staled (so the free walkthrough stays up):
- *   - 2xx that really is a PDF (content-type application/pdf AND `%PDF-`
- *     magic bytes) with a sha256 ≠ pin → `needs_review = true`;
+ *   - 2xx that really is a PDF (body starts `%PDF-` AND content-type is
+ *     application/pdf, application/octet-stream or absent) with a sha256 ≠ pin
+ *     → `needs_review = true`;
  *   - 2xx that is not a PDF (WAF page, soft 404) → reported `formFetchNotPdf`,
- *     no flag;
+ *     no flag, and `content_hash` is left untouched;
  *   - 404/410/DNS death → `needs_review = true` (`formMissing`), not stale.
  * `needs_review` is sticky: only Visa Ops clears it, via admin PATCH.
  * `formsOnly` checks pinned rows only (the monthly vercel.json cron).
@@ -182,9 +183,11 @@ export async function probeUrl(
         result.contentHash = `sha256:${createHash("sha256").update(buf).digest("hex")}`;
         const contentType = res.headers?.get("content-type") ?? null;
         result.contentType = contentType;
+        // Cap R3-4: application/pdf, application/octet-stream or no content-type,
+        // AND the body starts with `%PDF-`. Anything else (text/html …) is not a PDF.
+        const ct = (contentType ?? "").trim();
         result.isPdf =
-          !!contentType &&
-          /^application\/pdf\b/i.test(contentType.trim()) &&
+          (ct === "" || /^application\/(pdf|octet-stream)\b/i.test(ct)) &&
           buf.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC);
       }
     } else {
@@ -340,7 +343,8 @@ export async function runSourceCheck(
         last_checked_at: checkedAt,
         last_http_status: probe.httpStatus,
       };
-      if (probe.contentHash) update.content_hash = probe.contentHash;
+      // Cap R3-5: a pinned form row keeps its content_hash when the body is not a PDF.
+      if (probe.contentHash && !formFetchNotPdf) update.content_hash = probe.contentHash;
       if (cls.markStale) update.status = "stale";
       if (setNeedsReview) update.needs_review = true;
       try {

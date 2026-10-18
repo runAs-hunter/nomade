@@ -137,7 +137,6 @@ export async function handleFormGet(request: Request, formId: string): Promise<N
       userId: g.userId,
       formId: def.formId,
       contentVersion: def.contentVersion,
-      consulatePostId: consulate.postId,
       template: view.template !== null,
       needsReview: row.needs_review === true,
       access: view.access,

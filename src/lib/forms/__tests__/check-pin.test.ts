@@ -80,14 +80,29 @@ describe("F12a link check: pinned form PDF hash (decision 6; Cap review of #40)"
   it.each([
     ["HTML block page with a 200", new TextEncoder().encode("<html>Request Rejected</html>"), "text/html"],
     ["PDF content-type but no %PDF- magic", new TextEncoder().encode("<html>soft 404</html>"), "application/pdf"],
-    ["%PDF- body without a content-type", new TextEncoder().encode("%PDF-1.7 x"), null],
-  ])("2xx that is not a verified PDF (%s) → formFetchNotPdf, no needs_review, not stale", async (_n, bytes, ct) => {
+    ["%PDF- magic but text/html", new TextEncoder().encode("%PDF-1.7 x"), "text/html; charset=utf-8"],
+  ])("2xx that is not a verified PDF (%s) → formFetchNotPdf, no needs_review, not stale, content_hash kept (R3-5)", async (_n, bytes, ct) => {
     const { summary, writes } = await run(bytes, { contentType: ct });
     expect(summary.formHashMismatch).toBe(0);
     expect(summary.formFetchNotPdf).toBe(1);
     const w = formWrite(writes);
     expect(w.update.needs_review).toBeUndefined();
     expect(w.update.status).toBeUndefined();
+    expect("content_hash" in w.update).toBe(false);
+    expect(w.update.last_checked_at).toBeTruthy();
+  });
+
+  it.each([
+    ["application/octet-stream", "application/octet-stream"],
+    ["no content-type", null],
+  ])("%s with a %PDF- body counts as a real PDF (R3-4)", async (_n, ct) => {
+    const changed = await run(new TextEncoder().encode("%PDF-1.7 moved behind a CDN"), { contentType: ct });
+    expect(changed.summary.formFetchNotPdf).toBe(0);
+    expect(changed.summary.formHashMismatch).toBe(1);
+    expect(formWrite(changed.writes).update.needs_review).toBe(true);
+    const same = await run(OFFICIAL, { contentType: ct });
+    expect(same.summary.formHashMismatch).toBe(0);
+    expect(formWrite(same.writes).update.content_hash).toBe(`sha256:${PIN}`);
   });
 
   it("dry run reports the mismatch but writes nothing", async () => {

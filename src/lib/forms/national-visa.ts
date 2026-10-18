@@ -60,9 +60,8 @@ export const FORMS_ARRIVAL_REMINDER = "Your target arrival: <month>. Enter the e
 export const FORMS_ARRIVAL_MONTH_PLACEHOLDER = "<month>";
 
 /**
- * Cap-approved 18 Oct: name check for fields 1 and 3. Verbatim from the 0.3
- * Jane Sample (/workspace/F12-phase0/build/build_jane_sample.py `NAMES_NOTE`,
- * printed in the footer of out/0.3-jane-sample-national-visa-form-SAMPLE.pdf).
+ * Cap-approved 18 Oct: name check for fields 1 and 3. Verbatim from the F12
+ * Phase 0.3 Jane Sample (its `NAMES_NOTE`, printed in the sample PDF footer).
  */
 export const FORMS_NAME_CHECK_NOTE =
   "Check the names in fields 1 and 3 against your passport: the form asks for them as listed in your travel document (note x).";

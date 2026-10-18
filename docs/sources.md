@@ -81,7 +81,7 @@ Errors: `{ error: { code, message, requestId } }` + `x-request-id`.
 
 ## Monthly refresh — `GET|POST /api/cron/check-sources`
 
-`Authorization: Bearer ${CRON_SECRET}` (purge-accounts pattern). **F12a (Cap, 18 Oct 2026):** `vercel.json` schedules it monthly, `0 4 1 * *` UTC (04:00 UTC on the 1st), in **forms-only mode** (Cap review of #40): the scheduled run checks only pinned form PDFs and never auto-stales any other source — the full F8 check stays manual, as F8 intended. Forms-only is selected for Vercel Cron calls (user-agent `vercel-cron/…`; the bearer is still required) and by `?formsOnly=1`. Vercel crons fire on Production only and send the bearer automatically; Isaias approves the schedule by merging. Manual calls without `?formsOnly` run the full check as before.
+`Authorization: Bearer ${CRON_SECRET}` (purge-accounts pattern). **F12a (Cap, 18 Oct 2026):** `vercel.json` schedules it monthly, `0 4 1 * *` UTC (04:00 UTC on the 1st), in **forms-only mode** (Cap review of #40): the scheduled run checks only pinned form PDFs and never auto-stales any other source — the full F8 check stays manual, as F8 intended. The cron path is `/api/cron/check-sources?formsOnly=1` (Cap R3-1); the Vercel Cron user-agent (`vercel-cron/…`) is a second guard that also forces forms-only. The bearer is always required. Vercel crons fire on Production only and send the bearer automatically; Isaias approves the schedule by merging. Manual calls without `?formsOnly` run the full check as before.
 
 | Query | Effect |
 |---|---|
@@ -111,9 +111,9 @@ Per active row (4 concurrent, 15 s timeout, `maxDuration = 60`):
 
 | Pinned PDF result | Effect |
 |---|---|
-| 2xx, verified PDF (`content-type: application/pdf` **and** body starts `%PDF-`), sha256 = pin | nothing |
+| 2xx, verified PDF (body starts `%PDF-` **and** content-type `application/pdf`, `application/octet-stream` or absent), sha256 = pin | nothing |
 | 2xx, verified PDF, sha256 ≠ pin | `needs_review = true`, `formHashMismatch: true` |
-| 2xx but not a verified PDF (WAF page, soft 404) | `formFetchNotPdf: true`; no flag |
+| 2xx but not a verified PDF (WAF page, soft 404, `text/html`) | `formFetchNotPdf: true`; no flag; `content_hash` **not** overwritten |
 | 404 / 410 / DNS failure | `needs_review = true`, `formMissing: true`, `action: "mark_needs_review"`; **not** stale |
 | 401/403/429/5xx/timeout | F8 outcome only; no flag |
 

@@ -75,7 +75,7 @@ F1.7 is still Done when Preview deploys and returns structured health JSON (even
 
 ## Cron (F2.6p)
 
-`vercel.json` schedules `GET /api/cron/purge-accounts` daily at `0 4 * * *` UTC and `GET /api/cron/check-sources` monthly at `0 4 1 * *` UTC (F12a, forms-only: pinned form PDFs only). Hobby Preview may not deliver crons the same way as Production — use manual curl with `Authorization: Bearer ${CRON_SECRET}` (Keeper) against Preview/local for smoke. Do **not** enable against `nomade-prod` from this task.
+`vercel.json` schedules `GET /api/cron/purge-accounts` daily at `0 4 * * *` UTC and `GET /api/cron/check-sources?formsOnly=1` monthly at `0 4 1 * *` UTC (F12a, forms-only: pinned form PDFs only). Hobby Preview may not deliver crons the same way as Production — use manual curl with `Authorization: Bearer ${CRON_SECRET}` (Keeper) against Preview/local for smoke. Do **not** enable against `nomade-prod` from this task.
 
 ## Related
 
