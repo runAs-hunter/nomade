@@ -19,13 +19,26 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 - **No new data collection.** The API takes no form input, and form values never reach the server.
 - **Consulate variants (Cap, 18 Oct).** Only `?consulate=new-york` gets the NY-headed PDF, template, source card and prefill. Every other post gets the walkthrough labelled "Based on the New York version of the form" plus a link to its own F5 `instructionUrl`, and no PDF. The consulate comes from the query param only; nothing is stored.
 - **Cap-approved copy (18 Oct).** The field 29 reminder, the name check (from the 0.3 Jane Sample) and the variant label sit in a marked block in `national-visa.ts`, outside the verbatim walkthrough content. The block lives in the generator template (`scripts/gen-forms-content.py`), so a regeneration keeps it.
-- **Paid pre-fill is client-enforced only (N9, by design — decision 2).** The template is a public static file and the name stays on the device, so `access: "paid"` is honoured by the app; the server cannot enforce it.
+- **Pro content is server-enforced (B1, rev 5).** With `access: "paid"` the detail carries no walkthrough, translation, field markers, stamps, template or cover-page copy; only the official card, citations, intro disclaimer and the non-NY label/own link. The template itself is a public static file and the name stays on the device, so the PDF step is also honoured by the app.
 - **Template URL from config.** `template.url` uses `FORMS_PUBLIC_BASE_URL` (else `VERCEL_PROJECT_PRODUCTION_URL`), never the request Host; `null` if neither, with `template.path` always present.
 - **Prefill is device-side and copy-only.** Only fields 1 and 3 are prefilled, from the account name (`PrefillKind = "accountName"`, enforced at compile time). Field 29 gets a margin reminder of the F11a arrival month, never a value. No field takes the consulate.
 - **No prefill on ambiguous fields.** These are the fields that carry the lock sentence.
 - **Byte-exact strings:** the disclaimer `Preliminary guidance — not legal advice` and the translation label.
 - **Logs** carry ids, counts, `access` and `needsReview` only.
 - **Database:** nomade-dev only. Never nomade-prod.
+
+## Rev 5 changes (since rev 4; B1, Isaias via Cap, 18 Oct 2026)
+- **The walkthrough and translation are Pro; the official form link stays free. Enforced by the server.** `access` (same rule: `"paid"` exactly when `entitlement.gateEnabled && !entitlement.journeyFull`; an unavailable entitlement fails closed) now covers the walkthrough, the translation and the pre-filled PDF.
+- **Paid (locked) detail** returns only the free parts:
+  - `source` (the official document card: publisher, `url`, `versionDate`, `retrievedAt`; still null for non-NY) and `references` (citations);
+  - `disclaimer`, and `intro` reduced to `{ title, text }` ("What this is (and isn't)");
+  - `variant` (with "Based on the New York version of the form" for non-NY) and `consulate` (own consulate link);
+  - `access: "paid"`, `entitlement`, `formId`, `contentVersion`, `stepId`.
+  - Withheld: `fields: []`, `sections: []`, `stamps: null`, `translationLabel: null`, `lockSentence: null`, `template: null`, `copy: null` (no name check, no field-29 reminder), `intro.labelsNote` / `intro.translationNote` absent.
+  - `prefill { available: false, reason: "paid" }` for NY (non-NY keeps `"consulate"`; a NY `needs_review` keeps `"needs_review"` and its `staleNotice`, which belongs to the free card).
+- **Non-NY users are gated the same way.** Gate off (or `journey_full`) keeps the rev 4 response unchanged.
+- **List items gain `access`** (`"free" | "paid"`, same rule) so the app can show the lock chip. The list never carried walkthrough content and still doesn't.
+- `contentVersion` is unchanged (no served copy changed).
 
 ## Rev 4 changes (since rev 3; Visa Ops sign-off, 18 Oct 2026)
 - **`contentVersion`** is now `"visa-ops-national-visa-2026-10-18-2"` (was `"visa-ops-national-visa-2026-10-18"`). Re-fetch any cached copy whose version differs.
@@ -89,7 +102,8 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
     "available": true,
     "needsReview": false,
     "variant": { "postId": "new-york", "templateScope": "US-consulate:new-york", "prefillPosts": ["new-york"], "matchesConsulate": true, "label": null },
-    "pdfAvailable": true                     // false unless consulate=new-york and the row is active
+    "pdfAvailable": true,                    // false unless consulate=new-york and the row is active
+    "access": "free"                         // rev 5: "paid" → show the lock chip (walkthrough is Pro)
   }],
   "disclaimer": "Preliminary guidance — not legal advice",
   "requestId": "…"
@@ -161,8 +175,8 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
     "F-C":    { "sourceId": null, "label": "…", "url": "…", "sha256": "…" },    // reference copy, no active row
     "NY-DNV": { "sourceId": "us-new-york-dnv", "label": "…", "url": "…" }
   },
-  "prefill": { "available": true, "reason": null, "staleNotice": null },  // reason: null | "consulate" | "needs_review"
-  "access": "free",                            // for the PRE-FILLED PDF only: "paid" → open PaywallView (F10)
+  "prefill": { "available": true, "reason": null, "staleNotice": null },  // reason: null | "consulate" | "needs_review" | "paid"
+  "access": "free",                            // walkthrough + translation + pre-filled PDF; "paid" → slim locked view (rev 5), upsell opens PaywallView (F10)
   "entitlement": { "journeyFull": false, "gateEnabled": false },   // same shape as checklist; may add "unavailable": true
   "requestId": "…"
 }
@@ -185,13 +199,13 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
 
 ### Rules for iOS
 - **NY-only PDF:** offer the PDF and pre-fill only when the device's post id is in `variant.prefillPosts` **and** `template` is non-null. Otherwise show `variant.label` and `consulate.officialUrl`.
-- **Paid pre-fill is enforced by the app** (the server cannot: the template is public and the name is on the device). Honour `access`.
+- **Paid content is enforced by the server** (rev 5: a paid view carries no walkthrough, template or copy). The app still honours `access` for the button and the lock chip.
 - **Send the consulate:** always send `?consulate=<the device's post id>`. Omit it when the post is unresolved.
 - **Non-NY users:** when `variant.matchesConsulate == false`, show `variant.label` above the walkthrough. Show a link to `consulate.officialUrl` (when present) as the user's own consulate page, and show no PDF and no pre-fill button. Never cache the NY template for a non-NY user.
 - **Name check:** show `copy.nameCheck` beside fields 1 and 3 when they are pre-filled.
 - **Field 29:** draw `copy.arrivalReminder` with `<month>` replaced by the target month.
-- **Free content:** the official document card, walkthrough, translation and stamps explainer are always free, whatever `access` says.
-- **`access` covers only the pre-filled PDF.** It is `"paid"` exactly when `entitlement.gateEnabled && !entitlement.journeyFull`. Paid → the PDF button opens the paywall.
+- **Free content (rev 5, B1):** the official document card, citations, the "What this is (and isn't)" intro, the disclaimer and the non-NY label/own-consulate link. The walkthrough, translation, stamps explainer and pre-filled PDF are Pro.
+- **`access`** is `"paid"` exactly when `entitlement.gateEnabled && !entitlement.journeyFull`. Paid → the server sends the slim locked view (see Rev 5); show the free parts and one upsell that opens the paywall. `entitlement.unavailable` → don't open the paywall.
 - **Stale form:** when `prefill.reason == "needs_review"`, hide the pre-fill button and show `prefill.staleNotice`, which is "This form may have changed — check the official link". `staleNotice` is null otherwise.
 - **Which fields to fill:** only fields where `prefill == "accountName"`, that is, fields 1 and 3. Copy the name exactly as the user entered it on the device: `familyName` → field 1, `givenName` → field 3. If the user gave no name, leave the field empty.
 - **Field 29:** `reminder: "arrivalMonth"` with `anchor { page: 2, x: 3, top: 266, width: 44 }`. Draw a margin note with the F11a target month (`checklist.intake` `arrivalMonth`), outside the form frame, which starts at x = 51. **Never write into field 29.**

@@ -128,12 +128,16 @@ export type FormListItem = {
   variant: ReturnType<typeof variantView>;
   /** NY consulate only: the pre-filled PDF can be offered. */
   pdfAvailable: boolean;
+  /** B1: "paid" → the walkthrough is Pro (the app shows its lock chip); the official link stays free. */
+  access: "free" | "paid";
 };
 
 export function buildFormList(
   rows: Map<string, FormSourceRow>,
   postId: UsConsulatePostId | null,
+  entitlement: FormEntitlement,
 ): FormListItem[] {
+  const access = formAccess(entitlement);
   return FORMS.map((f) => {
     const row = rows.get(f.sourceId);
     return {
@@ -147,14 +151,19 @@ export function buildFormList(
       needsReview: row?.needs_review === true,
       variant: variantView(postId),
       pdfAvailable: !!row && servesTemplate(postId),
+      access,
     };
   });
 }
 
 export type FormEntitlement = { journeyFull: boolean; gateEnabled: boolean; unavailable?: true };
 
-/** Pre-filled PDF access: "paid" exactly when the F10 gate is on and journey_full is not active. */
-export function pdfAccess(ent: FormEntitlement): "free" | "paid" {
+/**
+ * Access to the walkthrough, translation and pre-filled PDF (B1, Isaias via Cap,
+ * 18 Oct): "paid" exactly when the F10 gate is on and journey_full is not active
+ * (an unavailable entitlement fails closed). The official form link stays free.
+ */
+export function formAccess(ent: FormEntitlement): "free" | "paid" {
   return ent.gateEnabled && !ent.journeyFull ? "paid" : "free";
 }
 
@@ -198,14 +207,17 @@ export function buildFormView(args: {
   const publicBaseUrl = args.publicBaseUrl === undefined ? getFormsPublicBaseUrl() : args.publicBaseUrl;
   const needsReview = row.needs_review === true;
   const pdf = servesTemplate(consulatePostId);
-  const prefillAvailable = pdf && !needsReview;
+  const access = formAccess(entitlement);
+  // B1: a paid (locked) view carries only the free parts. Enforced here, not by the app.
+  const locked = access === "paid";
+  const prefillAvailable = pdf && !needsReview && !locked;
   return {
     formId: def.formId,
     contentVersion: def.contentVersion,
     stepId: def.stepId,
     disclaimer: FORMS_DISCLAIMER,
-    translationLabel: FORMS_TRANSLATION_LABEL,
-    lockSentence: FORMS_LOCK_SENTENCE,
+    translationLabel: locked ? null : FORMS_TRANSLATION_LABEL,
+    lockSentence: locked ? null : FORMS_LOCK_SENTENCE,
     variant: variantView(consulatePostId),
     consulate: consulateView(consulatePostId),
     /** Official NY form card. null unless the user's consulate is New York. */
@@ -224,7 +236,7 @@ export function buildFormView(args: {
           needsReview,
         }
       : null,
-    template: pdf
+    template: pdf && !locked
       ? {
           /** Absolute URL from config; null → resolve `path` against the API base. */
           url: publicBaseUrl ? new URL(NATIONAL_VISA_TEMPLATE.path, publicBaseUrl).toString() : null,
@@ -236,22 +248,34 @@ export function buildFormView(args: {
           hasAcroForm: NATIONAL_VISA_TEMPLATE.hasAcroForm,
         }
       : null,
-    copy: {
-      nameCheck: FORMS_NAME_CHECK_NOTE,
-      arrivalReminder: FORMS_ARRIVAL_REMINDER,
-      arrivalMonthPlaceholder: FORMS_ARRIVAL_MONTH_PLACEHOLDER,
-    },
-    intro: NATIONAL_VISA_INTRO,
-    sections: NATIONAL_VISA_SECTIONS,
-    fields: fieldsFor(pdf),
-    stamps: NATIONAL_VISA_STAMPS,
+    copy: locked
+      ? null
+      : {
+          nameCheck: FORMS_NAME_CHECK_NOTE,
+          arrivalReminder: FORMS_ARRIVAL_REMINDER,
+          arrivalMonthPlaceholder: FORMS_ARRIVAL_MONTH_PLACEHOLDER,
+        },
+    /** Locked: only the "What this is (and isn't)" disclaimer, not the label/translation notes. */
+    intro: locked
+      ? { title: NATIONAL_VISA_INTRO.title, text: NATIONAL_VISA_INTRO.text }
+      : NATIONAL_VISA_INTRO,
+    sections: locked ? [] : NATIONAL_VISA_SECTIONS,
+    fields: locked ? [] : fieldsFor(pdf),
+    stamps: locked ? null : NATIONAL_VISA_STAMPS,
+    /** Citations stay free (the official links). */
     references: referencesFor(pdf),
     prefill: {
       available: prefillAvailable,
-      reason: !pdf ? ("consulate" as const) : needsReview ? ("needs_review" as const) : null,
+      reason: !pdf
+        ? ("consulate" as const)
+        : needsReview
+          ? ("needs_review" as const)
+          : locked
+            ? ("paid" as const)
+            : null,
       staleNotice: pdf && needsReview ? FORMS_STALE_NOTICE : null,
     },
-    access: pdfAccess(entitlement),
+    access,
     entitlement,
   };
 }

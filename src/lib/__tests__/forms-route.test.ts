@@ -14,9 +14,15 @@ vi.mock("@/lib/supabase/server", () => ({ createServiceClient: () => db }));
 import { GET as LIST } from "@/app/api/forms/route";
 import { GET as GET_FORM } from "@/app/api/forms/[formId]/route";
 import {
+  FORMS_ARRIVAL_REMINDER,
+  FORMS_LOCK_SENTENCE,
   FORMS_NAME_CHECK_NOTE,
   FORMS_STALE_NOTICE,
+  FORMS_TRANSLATION_LABEL,
   NATIONAL_VISA_FIELDS,
+  NATIONAL_VISA_INTRO,
+  NATIONAL_VISA_SECTIONS,
+  NATIONAL_VISA_STAMPS,
   NATIONAL_VISA_TEMPLATE,
 } from "@/lib/forms/national-visa";
 import { US_CONSULATE_POSTS } from "@/lib/journey/consulates";
@@ -136,6 +142,7 @@ describe("GET /api/forms* (F12a)", () => {
         needsReview: false,
         variant: { postId: "new-york", templateScope: "US-consulate:new-york", prefillPosts: ["new-york"], matchesConsulate: true, label: null },
         pdfAvailable: true,
+        access: "free",
       },
     ]);
   });
@@ -256,13 +263,88 @@ describe("GET /api/forms* (F12a)", () => {
     expect(b.entitlement).toEqual({ journeyFull: false, gateEnabled: false });
   });
 
-  it("gate on + no journey_full → access paid (content still served)", async () => {
+  it("gate on + no journey_full → access paid: only the free card, disclaimer and sources (B1)", async () => {
     vi.stubEnv("BILLING_GATE_ENABLED", "true");
     const b = await (await getForm()).json();
     expect(b.access).toBe("paid");
-    expect(b.fields).toHaveLength(37);
     expect(b.entitlement).toEqual({ journeyFull: false, gateEnabled: true });
+    // Free: official document card, citations, disclaimer, the "What this is (and isn't)" intro.
+    expect(b.source).toMatchObject({
+      publisher: "Consolato Generale d'Italia a New York (MAECI)",
+      url: NY_PDF,
+      versionDate: null,
+      retrievedAt: "2026-10-18",
+    });
+    expect(b.references["F-NY"].url).toBe(NY_PDF);
+    expect(b.disclaimer).toBe("Preliminary guidance — not legal advice");
+    expect(b.intro).toEqual({ title: NATIONAL_VISA_INTRO.title, text: NATIONAL_VISA_INTRO.text });
+    // Pro: walkthrough, translation, markers, stamps, prefill, template, cover-page copy.
+    expect(b.fields).toEqual([]);
+    expect(b.sections).toEqual([]);
+    expect(b.stamps).toBeNull();
+    expect(b.translationLabel).toBeNull();
+    expect(b.lockSentence).toBeNull();
+    expect(b.template).toBeNull();
+    expect(b.copy).toBeNull();
+    expect(b.prefill).toEqual({ available: false, reason: "paid", staleNotice: null });
+    const list = await (await LIST(req("/api/forms?consulate=new-york"))).json();
+    expect(list.forms[0].access).toBe("paid");
   });
+
+  /** Every walkthrough string in national-visa.ts, as it appears inside JSON. */
+  const walkthroughStrings = (): string[] => {
+    const raw: string[] = [
+      ...NATIONAL_VISA_FIELDS.flatMap((f) => [f.labelIt, f.labelEn, f.asks, f.markerReason]),
+      ...NATIONAL_VISA_SECTIONS.map((s) => s.text),
+      NATIONAL_VISA_STAMPS.title,
+      ...NATIONAL_VISA_STAMPS.items,
+      NATIONAL_VISA_INTRO.labelsNote,
+      NATIONAL_VISA_INTRO.translationNote,
+      FORMS_TRANSLATION_LABEL,
+      FORMS_LOCK_SENTENCE,
+      FORMS_NAME_CHECK_NOTE,
+      FORMS_ARRIVAL_REMINDER,
+    ];
+    return [...new Set(raw.filter((s) => s && s.trim() !== ""))].map((s) => JSON.stringify(s).slice(1, -1));
+  };
+
+  it.each(["new-york", "chicago", null])(
+    "paid access (consulate %s): detail and list contain no walkthrough string (B1)",
+    async (postId) => {
+      vi.stubEnv("BILLING_GATE_ENABLED", "true");
+      const strings = walkthroughStrings();
+      expect(strings.length).toBeGreaterThan(37 * 2);
+      const res = await getForm("national-visa", undefined, postId);
+      expect(res.status).toBe(200);
+      const detail = await res.text();
+      const list = await (await LIST(req(postId ? `/api/forms?consulate=${postId}` : "/api/forms"))).text();
+      for (const text of [detail, list]) {
+        for (const s of strings) expect(text, s).not.toContain(s);
+        expect(text).not.toContain('"fieldId"');
+        expect(text).not.toContain('"marker"');
+        expect(text).not.toContain(NATIONAL_VISA_TEMPLATE.path);
+      }
+      const b = JSON.parse(detail);
+      expect(b.template).toBeNull();
+      expect(b.access).toBe("paid");
+      expect(b.disclaimer).toBe("Preliminary guidance — not legal advice");
+      if (postId === "new-york") {
+        expect(b.source.url).toBe(NY_PDF);
+        expect(b.variant.label).toBeNull();
+      } else {
+        // Non-NY users are gated the same way and still never get the NY card or PDF.
+        expect(b.source).toBeNull();
+        expect(b.variant.label).toBe("Based on the New York version of the form");
+        expect(b.consulate?.postId ?? null).toBe(postId);
+        expect(b.prefill.reason).toBe("consulate");
+        expect(detail).not.toContain("formulario_nazionale_visti2.pdf");
+      }
+      // The same request with journey_full serves the walkthrough (the check above is meaningful).
+      db = makeDb(seed({ entitlement: "active" }));
+      const full = await (await getForm("national-visa", undefined, postId)).text();
+      expect(full).toContain(strings[0]);
+    },
+  );
 
   it("gate on + active journey_full → free; revoked → paid", async () => {
     vi.stubEnv("BILLING_GATE_ENABLED", "true");
@@ -280,6 +362,9 @@ describe("GET /api/forms* (F12a)", () => {
     const b = await res.json();
     expect(b.access).toBe("paid");
     expect(b.entitlement).toEqual({ journeyFull: false, gateEnabled: true, unavailable: true });
+    // Fails closed: no walkthrough while the entitlement can't be read.
+    expect(b.fields).toEqual([]);
+    expect(b.template).toBeNull();
   });
 
   it("needs_review → prefill hidden with the stale notice", async () => {
