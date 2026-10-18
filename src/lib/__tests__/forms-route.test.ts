@@ -137,7 +137,7 @@ describe("GET /api/forms* (F12a)", () => {
         stepId: "submit-application",
         sourceId: "us-new-york-national-visa-form",
         scope: "US-consulate:new-york",
-        contentVersion: "visa-ops-national-visa-2026-10-18-2",
+        contentVersion: "visa-ops-national-visa-2026-10-18-3",
         available: true,
         needsReview: false,
         variant: { postId: "new-york", templateScope: "US-consulate:new-york", prefillPosts: ["new-york"], matchesConsulate: true, label: null },
@@ -393,6 +393,24 @@ describe("GET /api/forms* (F12a)", () => {
     db = makeDb(seed(), ["sources"]);
     expect((await getForm()).status).toBe(500);
   });
+
+  it.each(["new-york", "chicago", null])(
+    "served display text has no internal ids or notes (consulate %s); stepId stays a structured field",
+    async (postId) => {
+      for (const gate of ["false", "true"]) {
+        vi.stubEnv("BILLING_GATE_ENABLED", gate);
+        const detail = await (await getForm("national-visa", undefined, postId)).json();
+        const list = await (await LIST(req(postId ? `/api/forms?consulate=${postId}` : "/api/forms"))).json();
+        expect(detail.stepId).toBe("submit-application");
+        expect(list.forms[0].stepId).toBe("submit-application");
+        // Drop the structured `stepId` key; everything else is display text or data.
+        const withoutStepId = (v: unknown) => JSON.stringify(v, (k, x) => (k === "stepId" ? undefined : x));
+        for (const text of [withoutStepId(detail), withoutStepId(list)]) {
+          expect(text).not.toMatch(/active row|visa-form-source\.csv|submit-application|`[^`]*`/);
+        }
+      }
+    },
+  );
 
   it("accepts no input and returns no personal data fields", async () => {
     const text = await (await getForm()).text();

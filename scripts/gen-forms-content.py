@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""F12a: regenerate src/lib/forms/national-visa.ts from docs/forms/visa-form-walkthrough.md (verbatim copy)."""
-import re, json, os
+"""F12a: regenerate src/lib/forms/national-visa.ts from docs/forms/visa-form-walkthrough.md (verbatim copy).
+
+  python3 scripts/gen-forms-content.py            # write src/lib/forms/national-visa.ts
+  python3 scripts/gen-forms-content.py --stdout   # print it instead (tests compare it to the repo file)
+  FORMS_WALKTHROUGH_MD=<path> overrides the markdown (tests feed it internal text to prove the guard fails).
+"""
+import re, json, os, sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-md = open(os.path.join(ROOT, 'docs/forms/visa-form-walkthrough.md'), encoding='utf-8').read().split('\n')
+MD_PATH = os.environ.get('FORMS_WALKTHROUGH_MD') or os.path.join(ROOT, 'docs/forms/visa-form-walkthrough.md')
+md = open(MD_PATH, encoding='utf-8').read().split('\n')
 L = lambda n: md[n-1]
 def strip_bold_lead(s): return s
 LOCK = "This depends on your situation. Check your consulate's instructions or ask a qualified immigration professional."
@@ -31,10 +37,17 @@ def public_reason(r):
     assert not INTERNAL_TEXT.search(r), r
     return r
 # Never served: "Note for Studio", "## Uncertain / for Visa Ops" (internal, incl. its
-# "Decided (Cap …)" lines) and the stamps bullet that points at the internal
-# `ny-packet.md`. The generator reads only the line ranges below; this guard
-# fails generation if any internal text reaches served copy.
-INTERNAL_TEXT = re.compile(r'\bCap\b|Decided|Flagged|Note for Studio|ny-packet|for Visa Ops')
+# "Decided (Cap …)" lines), the stamps bullet that points at the internal
+# `ny-packet.md`, the header "Step: `submit-application`" line (5) and the
+# "(see `visa-form-source.csv`)" line under the Sources table (20). The generator
+# reads only the line ranges below; this guard fails generation if any internal
+# text reaches served display copy (Cap, 18 Oct): workflow terms, "active row",
+# any backticked id, the source CSV name, or the step id. The API's structured
+# `stepId` field is not display text and is not built from the markdown.
+INTERNAL_TEXT = re.compile(
+    r'\bCap\b|Decided|Flagged|Note for Studio|ny-packet|for Visa Ops'
+    r'|active row|`[^`]*`|visa-form-source\.csv|submit-application'
+)
 assert sorted(markers) == list(range(1, 38))
 REFS = re.compile(r'\[(F-NY|F-C|NY-DNV)\]')
 def refs(s): 
@@ -89,8 +102,21 @@ def _served_strings(v):
         for x in v.values(): yield from _served_strings(x)
     elif isinstance(v, list):
         for x in v: yield from _served_strings(x)
-for s_ in _served_strings([out, sections, stamps, intro, [md[15], md[16], md[17]]]):
-    assert not INTERNAL_TEXT.search(s_), s_
+# Reference labels exactly as served (column 2 of the Sources table).
+REF_LABELS = [md[i].split(' | ')[1] for i in (15, 16, 17)]
+assert md[19].startswith("Neither form prints") and "visa-form-source.csv" in md[19], "line 20 moved; re-check what is dropped"
+assert md[4].startswith("Status:") and "submit-application" in md[4], "line 5 moved; re-check what is dropped"
+# Display text only: the structured keys (fieldId, marker, prefill, refs, sourceIds, …) are not copy.
+DISPLAY_KEYS = ("labelIt", "labelEn", "asks", "markerReason")
+served_display = (
+    [f[k] for f in out for k in DISPLAY_KEYS]
+    + list(_served_strings([[s["text"], s.get("items", [])] for s in sections]))
+    + list(_served_strings([stamps, intro, REF_LABELS]))
+    + [LOCK, TL]
+)
+leaks = [s_ for s_ in served_display if INTERNAL_TEXT.search(s_)]
+if leaks:
+    sys.exit("internal text in served copy:\n" + "\n".join("  " + INTERNAL_TEXT.search(s_).group(0) + " :: " + s_[:160] for s_ in leaks))
 body = f'''/**
  * F12a — national visa (type D) application form: content for GET /api/forms/national-visa.
  *
@@ -101,8 +127,8 @@ body = f'''/**
  * put. Not legal advice. Form values never reach the server (decision 2).
  */
 
-/** Bumped whenever the served copy changes. "-2": Visa Ops sign-off wording (18 Oct 2026). */
-export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-2";
+/** Bumped whenever the served copy changes. "-2": Visa Ops sign-off wording; "-3": Visa Ops [NY-DNV] citation reworded (18 Oct 2026). */
+export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-3";
 
 export const NATIONAL_VISA_FORM_ID = "national-visa";
 
@@ -215,19 +241,19 @@ export type FormReference = {{
 export const NATIONAL_VISA_REFERENCES: Record<FormRef, FormReference> = {{
   "F-NY": {{
     sourceId: NATIONAL_VISA_SOURCE_ID,
-    label: {json.dumps(md[15].split(' | ')[1], ensure_ascii=False)},
+    label: {json.dumps(REF_LABELS[0], ensure_ascii=False)},
     url: "https://consnewyork.esteri.it/wp-content/uploads/2023/06/formulario_nazionale_visti2.pdf",
     sha256: "d0631552d1e474c522911cc74d18c15fe474984ad79bd65ce3f5a880ee13ed20",
   }},
   "F-C": {{
     sourceId: null,
-    label: {json.dumps(md[16].split(' | ')[1], ensure_ascii=False)},
+    label: {json.dumps(REF_LABELS[1], ensure_ascii=False)},
     url: "https://vistoperitalia.esteri.it/files/public/moduli/it/Formulario_Visto_Nazionale.pdf",
     sha256: "d1d61879b3df549fad0ea0c756a2357c28b3e88d91149a0e82dfb6535f27a880",
   }},
   "NY-DNV": {{
     sourceId: "us-new-york-dnv",
-    label: {json.dumps(md[17].split(' | ')[1], ensure_ascii=False)},
+    label: {json.dumps(REF_LABELS[2], ensure_ascii=False)},
     url: "https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/visas-to-enter-italy/digital-nomad-remote-worker-visa/",
   }},
 }};
@@ -240,6 +266,9 @@ export const NATIONAL_VISA_STAMPS = {ts(stamps)} as const;
 
 export const NATIONAL_VISA_FIELDS: FormField[] = {ts(out)};
 '''
+if '--stdout' in sys.argv:
+    sys.stdout.write(body)
+    sys.exit(0)
 open(os.path.join(ROOT, 'src/lib/forms/national-visa.ts'), 'w', encoding='utf-8').write(body)
 print(len(out), sum(f['ambiguous'] for f in out), [f['number'] for f in out if f['ambiguous']])
 print([ (f['number'], f['refs']) for f in out if not f['sourceIds']])

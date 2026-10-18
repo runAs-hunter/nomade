@@ -27,6 +27,12 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 - **Logs** carry ids, counts, `access` and `needsReview` only.
 - **Database:** nomade-dev only. Never nomade-prod.
 
+## Rev 6 changes (since rev 5; Visa Ops citation rewording, 18 Oct 2026)
+- **`contentVersion`** is now `"visa-ops-national-visa-2026-10-18-3"` (was `"visa-ops-national-visa-2026-10-18-2"`). Re-fetch any cached copy whose version differs.
+- **Wording only (1 served string):** `references["NY-DNV"].label` "NY Digital Nomad / Remote Worker visa page (active row `us-new-york-dnv`)" → "Consulate General of Italy in New York: Digital Nomad / Remote Worker visa page".
+- **Generator guard:** generation fails if any served display text contains `Cap`, `Decided`, `Flagged`, `Note for Studio`, `ny-packet`, `for Visa Ops`, `active row`, a backticked id, `visa-form-source.csv` or `submit-application`. The walkthrough's "Step: `submit-application`" header line and its "(see `visa-form-source.csv`)" Sources note are not served (never were). The structured `stepId: "submit-application"` field is unchanged.
+- No keys, ids, markers, prefill rules, anchors, `copy` or access rules changed.
+
 ## Rev 5 changes (since rev 4; B1, Isaias via Cap, 18 Oct 2026)
 - **The walkthrough and translation are Pro; the official form link stays free. Enforced by the server.** `access` (same rule: `"paid"` exactly when `entitlement.gateEnabled && !entitlement.journeyFull`; an unavailable entitlement fails closed) now covers the walkthrough, the translation and the pre-filled PDF.
 - **Paid (locked) detail** returns only the free parts:
@@ -72,7 +78,7 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 - **`prefill`** is now `{ available, reason: null | "consulate" | "needs_review", staleNotice }`. `staleNotice` is set only for New York with `needs_review`.
 - **List items** gain `variant` and `pdfAvailable`. `pdfAvailable` is true only for New York with an active row.
 - **Unchanged:** `reminder: "arrivalMonth"` stays on field 29 for every consulate.
-`FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-2"`.
+`FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-3"` (rev 6).
 
 ## Common
 - Auth: `Authorization: Bearer <Supabase access token>`, the same as `/api/journey/*`. Active accounts only.
@@ -98,7 +104,7 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
     "stepId": "submit-application",
     "sourceId": "us-new-york-national-visa-form",
     "scope": "US-consulate:new-york",
-    "contentVersion": "visa-ops-national-visa-2026-10-18-2",
+    "contentVersion": "visa-ops-national-visa-2026-10-18-3",
     "available": true,
     "needsReview": false,
     "variant": { "postId": "new-york", "templateScope": "US-consulate:new-york", "prefillPosts": ["new-york"], "matchesConsulate": true, "label": null },
@@ -118,7 +124,7 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
 ```jsonc
 {
   "formId": "national-visa",
-  "contentVersion": "visa-ops-national-visa-2026-10-18-2",
+  "contentVersion": "visa-ops-national-visa-2026-10-18-3",
   "stepId": "submit-application",            // decision 4: "Form" row on this step
   "disclaimer": "Preliminary guidance — not legal advice",                      // byte-exact
   "translationLabel": "English translation — for understanding only. Submit the Italian original.", // byte-exact; top of translation + every page

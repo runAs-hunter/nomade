@@ -1,5 +1,7 @@
+import { execFileSync, spawnSync } from "child_process";
 import { createHash } from "crypto";
-import { readFileSync, readdirSync } from "fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "fs";
+import os from "os";
 import path from "path";
 import { describe, expect, it } from "vitest";
 import {
@@ -144,6 +146,80 @@ describe("F12a national visa form content", () => {
     for (const l of [...uncertain, studio, packet.slice(2)]) expect(served).not.toContain(JSON.stringify(l).slice(1, -1));
     expect(served).not.toMatch(/\bCap\b|Decided|Flagged|ny-packet/);
     expect(NATIONAL_VISA_STAMPS.items).toHaveLength(2);
+  });
+
+  /** Every string the API shows as text (labels, copy, citations, Cap-approved notes). */
+  const SERVED_DISPLAY = [
+    ...ALL_TEXT,
+    ...NATIONAL_VISA_SECTIONS.flatMap((s) => [s.text, ...(s.items ?? [])]),
+    NATIONAL_VISA_INTRO.title,
+    NATIONAL_VISA_STAMPS.title,
+    ...Object.values(NATIONAL_VISA_REFERENCES).map((r) => r.label),
+    FORMS_TRANSLATION_LABEL,
+    FORMS_LOCK_SENTENCE,
+    FORMS_STALE_NOTICE,
+    FORMS_NY_VARIANT_LABEL,
+    FORMS_ARRIVAL_REMINDER,
+    FORMS_NAME_CHECK_NOTE,
+  ];
+  const BANNED = /\bCap\b|Decided|Flagged|Note for Studio|ny-packet|for Visa Ops|active row|`[^`]*`|visa-form-source\.csv|submit-application/;
+
+  it("served display text has no internal workflow text, active-row notes, backticked ids, CSV name or step id (Cap, 18 Oct)", () => {
+    for (const s of SERVED_DISPLAY) expect(s, s).not.toMatch(BANNED);
+    expect(NATIONAL_VISA_REFERENCES["NY-DNV"].label).toBe(
+      "Consulate General of Italy in New York: Digital Nomad / Remote Worker visa page",
+    );
+    // The header "Step:" line (5) and the Sources CSV note (20) are internal and never served.
+    const lines = MD.split("\n");
+    expect(lines[4]).toMatch(/^Status: .*Step: `submit-application`\.$/);
+    expect(lines[19]).toMatch(/^Neither form prints .*\(see `visa-form-source\.csv`\)/);
+    const served = JSON.stringify(SERVED_DISPLAY);
+    for (const l of [lines[4], lines[19]]) expect(served).not.toContain(JSON.stringify(l).slice(1, -1));
+  });
+
+  const GEN = path.join(ROOT, "scripts/gen-forms-content.py");
+  const runGen = (md?: string) => {
+    let env = { ...process.env };
+    if (md !== undefined) {
+      const dir = mkdtempSync(path.join(os.tmpdir(), "f12-walkthrough-"));
+      const file = path.join(dir, "walkthrough.md");
+      writeFileSync(file, md);
+      env = { ...env, FORMS_WALKTHROUGH_MD: file };
+    }
+    return spawnSync("python3", [GEN, "--stdout"], { env, encoding: "utf8" });
+  };
+
+  it("national-visa.ts is exactly what the generator writes from the walkthrough", () => {
+    const res = runGen();
+    expect(res.status, res.stderr).toBe(0);
+    expect(res.stdout).toBe(readFileSync(path.join(ROOT, "src/lib/forms/national-visa.ts"), "utf8"));
+    expect(execFileSync("python3", ["--version"], { encoding: "utf8" })).toMatch(/^Python 3/);
+  });
+
+  it.each([
+    ["active row", (l: string) => l.replace("visa page |", "visa page (active row x) |")],
+    ["backticked id", (l: string) => l.replace("visa page |", "visa page (`us-new-york-dnv`) |")],
+    ["visa-form-source.csv", (l: string) => l.replace("visa page |", "visa page, see visa-form-source.csv |")],
+    ["submit-application", (l: string) => l.replace("visa page |", "visa page (submit-application) |")],
+    ["Cap", (l: string) => l.replace("visa page |", "visa page. Flagged for Cap |")],
+  ])("the generator refuses served text containing %s", (term, inject) => {
+    const lines = MD.split("\n");
+    expect(lines[17]).toMatch(/^\| \[NY-DNV\] \| .* visa page \|/);
+    lines[17] = inject(lines[17]!);
+    const res = runGen(lines.join("\n"));
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain("internal text in served copy");
+    expect(res.stdout).toBe("");
+    expect(res.stderr.length, term).toBeGreaterThan(0);
+  });
+
+  it("the generator also refuses internal text in a field's copy", () => {
+    const lines = MD.split("\n");
+    const i = lines.findIndex((l) => l.startsWith("| 1 | Cognome (x) |"));
+    lines[i] = lines[i]!.replace("(note x). [F-NY] |", "(note x). Step `submit-application`. [F-NY] |");
+    const res = runGen(lines.join("\n"));
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain("submit-application");
   });
 
   it("only the account name is ever prefilled (PrefillKind narrowed; arrival month / consulate never)", () => {
