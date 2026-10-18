@@ -1,5 +1,5 @@
 -- F11a: source summaries (Visa Ops, 2026-10-16) + two new rows + family step mapping.
--- GENERATED from docs/sources/F11-source-summaries.csv (32 rows) and /workspace/F11-visa-ops-copy.md.
+-- GENERATED from docs/sources/F11-source-summaries.csv (32 rows) and the F11 Visa Ops copy handoff (F11-visa-ops-copy.md).
 -- Apply scope: local + nomade-dev ONLY. not nomade-prod until F11a launch.
 
 alter table internal.sources

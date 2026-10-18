@@ -130,6 +130,8 @@ export type CheckUpdate = {
   last_http_status: number;
   content_hash?: string;
   status?: "stale";
+  /** F12a: pinned form PDF hash mismatch (never written false by the check). */
+  needs_review?: true;
 };
 
 /**

@@ -5,7 +5,7 @@ Prepared 2026-10-16 (Europe/Rome) for Cap's manual Preview eval (runbook F11b, d
 ## Ground rules this eval checks
 
 - **Grounding.** Answers come only from the top 8 retrieved active sources, as `[S1]…[S8]`.
-  - The grounding text is each source's `summary` from `/workspace/F11-source-summaries.csv` (34 rows), plus its `notes`.
+  - The grounding text is each source's `summary` from `docs/sources/F11-source-summaries.csv` (34 rows), plus its `notes`.
   - `notes_for_cap` in the CSV is Visa Ops commentary. It is **not** grounding text, unless Cap copies it into `internal.sources.notes`.
 - **Citations.** Each claim is followed by `[S#]`. At least 1 valid citation per answer. Otherwise the outcome is `refused_uncited`.
 - **Refusal sentence.** When no source covers the question, the bot says exactly this (runbook F11b):

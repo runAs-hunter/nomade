@@ -25,6 +25,7 @@ Migrations: `supabase/migrations/20261008133111_f8_official_sources.sql` (table)
 | `status` | `text` | `active \| stale \| retired`. Public API returns `active` only. |
 | `notes` | `text` | Internal curation notes — **not** returned by public GETs. |
 | `content_hash` | `text` | Optional `sha256:<hex>` (refresh `?hash=1`). Change detection only. |
+| `needs_review` | `boolean` | F12a. Set `true` by the check when a pinned form PDF hash differs (see docs/forms.md). Sticky; Visa Ops clears it with admin `PATCH { "needsReview": false }` after re-verifying. |
 | `snapshot_ref` | `text` | Optional pointer to a stored snapshot (unused in F8). |
 | `step_ids` | `text[]` | Optional F5 catalog step ids (empty in seed — Visa Ops maps later). |
 | `created_at`, `updated_at` | `timestamptz` | `updated_at` via `internal.set_updated_at()`. |
@@ -80,12 +81,13 @@ Errors: `{ error: { code, message, requestId } }` + `x-request-id`.
 
 ## Monthly refresh — `GET|POST /api/cron/check-sources`
 
-Manual trigger only (purge-accounts pattern): `Authorization: Bearer ${CRON_SECRET}`. **No `vercel.json` cron entry** (Vercel crons fire on Production only — wiring waits for an explicit Isaias ask).
+`Authorization: Bearer ${CRON_SECRET}` (purge-accounts pattern). **F12a (Cap, 18 Oct 2026):** `vercel.json` schedules it monthly, `0 4 1 * *` UTC (04:00 UTC on the 1st), in **forms-only mode** (Cap review of #40): the scheduled run checks only pinned form PDFs and never auto-stales any other source — the full F8 check stays manual, as F8 intended. The cron path is `/api/cron/check-sources?formsOnly=1` (Cap R3-1); the Vercel Cron user-agent (`vercel-cron/…`) is a second guard that also forces forms-only. The bearer is always required. Vercel crons fire on Production only and send the bearer automatically; Isaias approves the schedule by merging. Manual calls without `?formsOnly` run the full check as before.
 
 | Query | Effect |
 |---|---|
 | `?dryRun=1` | Probe only; **no DB writes**. Use first every month. |
 | `?hash=1` | GET + `sha256` the body; store `content_hash`; report `hashChanged`. |
+| `?formsOnly=1` | F12a. Pinned form rows only (implied for Vercel Cron). |
 
 Per active row (4 concurrent, 15 s timeout, `maxDuration = 60`):
 
@@ -105,7 +107,21 @@ Per active row (4 concurrent, 15 s timeout, `maxDuration = 60`):
    Final-URL host change (ignoring `www.`) → `hostChanged: true` flag only. Hash change → `hashChanged: true` flag only (consulate HTML churns).
 3. Non-dry-run writes **operational columns only**: `last_checked_at`, `last_http_status`, `content_hash` (hash mode), `status = 'stale'` (hard failures). Update guarded by `status = 'active'`. Never touches title / URL / notes / curation fields.
 
-Response: `200 { ok, requestId, checkedAt, dryRun, hashed, checked, healthy, botBlocked, staleFlagged, needsReview, errors, hostChanged, hashChanged, writeFailures, results: [{ id, httpStatus, method, outcome, action, hostChanged, hashChanged, networkError? }] }`. In dry-run, `staleFlagged` / `action: "mark_stale"` mean *would* stale.
+**F12a pinned forms:** rows in `FORM_TEMPLATE_PINS` (src/lib/forms/registry.ts) are always fetched with `GET` and hashed, even without `?hash=1`. Pinned rows are **never staled** (so the free walkthrough stays up):
+
+| Pinned PDF result | Effect |
+|---|---|
+| 2xx, verified PDF (body starts `%PDF-` **and** content-type `application/pdf`, `application/octet-stream` or absent), sha256 = pin | nothing |
+| 2xx, verified PDF, sha256 ≠ pin | `needs_review = true`, `formHashMismatch: true` |
+| 2xx but not a verified PDF (WAF page, soft 404, `text/html`) | `formFetchNotPdf: true`; no flag; `content_hash` **not** overwritten |
+| 404 / 410 / DNS failure | `needs_review = true`, `formMissing: true`, `action: "mark_needs_review"`; **not** stale |
+| 401/403/429/5xx/timeout | F8 outcome only; no flag |
+
+The compare is always against the pin (registry), not the row's stored `content_hash`.
+
+**Naming (Cap review N5):** the summary's `needsReview` **count** is the number of rows whose F8 *outcome* was `needs_review` (e.g. a 5xx) — it is **not** the `needs_review` **column**. Count column flags with `formHashMismatch + formMissing`.
+
+Response: `200 { ok, requestId, checkedAt, dryRun, hashed, checked, healthy, botBlocked, staleFlagged, needsReview, errors, hostChanged, hashChanged, formHashMismatch, formFetchNotPdf, formMissing, formsOnly, writeFailures, results: [{ id, httpStatus, method, outcome, action, hostChanged, hashChanged, formHashMismatch?, formFetchNotPdf?, formMissing?, networkError? }] }`. In dry-run, `staleFlagged` / `action: "mark_stale"` mean *would* stale.
 
 Why a browser-like UA **and** an allowlist: `prenotami.esteri.it` answers 403 to non-browser agents (e.g. curl's default UA) and 200 to browsers (verified 2026-10-08). The UA avoids most bot 403s; the allowlist guarantees a bot 403 never stales Prenot@Mi even if the WAF tightens.
 
@@ -132,7 +148,7 @@ curl -sS -X POST -H "Authorization: Bearer $CRON_SECRET" "https://<host>/api/cro
 
 ## Out of scope (F8)
 
-Chat cite UX / prompt changes (F9), RAG / embeddings, iOS UI, multi-country seed, `vercel.json` cron, nomade-prod.
+Chat cite UX / prompt changes (F9), RAG / embeddings, iOS UI, multi-country seed, nomade-prod.
 
 ## F9 — `step_ids` mapping
 
