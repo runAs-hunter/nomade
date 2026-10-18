@@ -5,7 +5,7 @@ import { withRequestId } from "@/lib/journey/http";
 import { log } from "@/lib/log";
 import { getRequestId } from "@/lib/request-id";
 import { FORM_TEMPLATE_PINS } from "@/lib/forms/registry";
-import { runSourceCheck } from "@/lib/sources/check";
+import { isVercelCron, runSourceCheck } from "@/lib/sources/check";
 import { applyCheckUpdate, listActiveForCheck } from "@/lib/sources/repo";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -21,11 +21,16 @@ function flag(url: URL, name: string): boolean {
 
 /**
  * GET|POST /api/cron/check-sources (F8 monthly freshness stub)
- * Authorization: Bearer ${CRON_SECRET} (purge-accounts pattern). F12a (Cap,
- * 18 Oct 2026): scheduled monthly in vercel.json (`0 5 1 * *` UTC, Production
- * only); still callable by hand.
+ * Authorization: Bearer ${CRON_SECRET} (purge-accounts pattern).
+ * F12a (Cap review of #40, 18 Oct 2026): scheduled monthly in vercel.json
+ * (`0 4 1 * *` UTC, Production only) in FORMS-ONLY mode: the scheduled run
+ * checks pinned form PDFs only and never auto-stales other sources (F8 kept the
+ * full check manual for that reason). Forms-only applies to Vercel Cron calls
+ * (user-agent `vercel-cron/…`) and to `?formsOnly=1`. A manual call without it
+ * runs the full F8 check as before.
  * Query: ?dryRun=1 (probe only, no writes), ?hash=1 (GET + sha256 body).
  * F12a: pinned form PDFs are always hashed; a mismatch sets needs_review.
+ *       ?formsOnly=1 (pinned form rows only; implied for Vercel Cron).
  */
 async function handle(request: Request): Promise<NextResponse> {
   const requestId = getRequestId(request);
@@ -57,6 +62,7 @@ async function handle(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const dryRun = flag(url, "dryRun");
   const hash = flag(url, "hash");
+  const formsOnly = flag(url, "formsOnly") || isVercelCron(request);
 
   try {
     const service = createServiceClient();
@@ -77,17 +83,19 @@ async function handle(request: Request): Promise<NextResponse> {
         applyUpdate: (id, update) => applyCheckUpdate(service, id, update),
         pinnedHashes: FORM_TEMPLATE_PINS,
       },
-      { dryRun, hash },
+      { dryRun, hash, formsOnly },
     );
 
     for (const r of summary.results) {
-      if (r.outcome !== "ok" || r.formHashMismatch) {
+      if (r.outcome !== "ok" || r.formHashMismatch || r.formFetchNotPdf || r.formMissing) {
         logger.warn("check-sources flagged", {
           sourceId: r.id,
           outcome: r.outcome,
           httpStatus: r.httpStatus,
           action: r.action,
           ...(r.formHashMismatch ? { formHashMismatch: true } : {}),
+          ...(r.formMissing ? { formMissing: true } : {}),
+          ...(r.formFetchNotPdf ? { formFetchNotPdf: true } : {}),
           dryRun,
         });
       }

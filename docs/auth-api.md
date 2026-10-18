@@ -30,7 +30,7 @@ Shared Bearer verification for protected App Router routes. Contract: [`adrs/F2.
 | `POST /api/billing/app-store/transactions` | Protected (F10) | Bearer via `requireAccess` + active account |
 | `GET /api/sources`, `GET /api/sources/{id}` | Public (F8) | None — `status = active` rows only |
 | `POST /api/sources`, `PATCH\|DELETE /api/sources/{id}` | Admin (F8) | `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` **or** user JWT listed in `SOURCES_ADMIN_USER_IDS` — see [`sources.md`](./sources.md) |
-| `GET\|POST /api/cron/check-sources` | Internal: monthly cron + manual trigger (F8/F12a) | `Authorization: Bearer ${CRON_SECRET}` only. `vercel.json` `0 5 1 * *` UTC |
+| `GET\|POST /api/cron/check-sources` | Internal: monthly cron + manual trigger (F8/F12a) | `Authorization: Bearer ${CRON_SECRET}` only. `vercel.json` `0 4 1 * *` UTC, forms-only (pinned PDFs; never stales other rows); `?formsOnly=1` |
 
 ## Protect a new route
 

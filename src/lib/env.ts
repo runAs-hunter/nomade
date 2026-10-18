@@ -60,6 +60,8 @@ export const serverEnvSchema = z
     ASK_ENABLED: z.enum(["true", "false"]).optional(),
     /** F12a forms library. "true" serves GET /api/forms*. Default OFF (ships in 1.1). */
     FORMS_ENABLED: z.enum(["true", "false"]).optional(),
+    /** F12a public https origin for the template PDF URL (default: Vercel production URL). */
+    FORMS_PUBLIC_BASE_URL: z.string().trim().url().optional(),
     /** F11b AI Gateway model id (default anthropic/claude-sonnet-4.5). */
     ASK_MODEL: z.string().trim().min(1).optional(),
     /** F11b gateway fallback model id (default anthropic/claude-haiku-4.5; "none" disables). */
@@ -145,6 +147,7 @@ export function parseServerEnv(source: EnvSource = process.env): ServerEnv {
     INTAKE_ENABLED: source.INTAKE_ENABLED || undefined,
     ASK_ENABLED: source.ASK_ENABLED || undefined,
     FORMS_ENABLED: source.FORMS_ENABLED || undefined,
+    FORMS_PUBLIC_BASE_URL: source.FORMS_PUBLIC_BASE_URL || undefined,
     ASK_MODEL: source.ASK_MODEL || undefined,
     ASK_FALLBACK_MODEL: source.ASK_FALLBACK_MODEL || undefined,
     AI_GATEWAY_API_KEY: source.AI_GATEWAY_API_KEY || undefined,
@@ -343,6 +346,24 @@ export function isIntakeEnabled(source: EnvSource = process.env): boolean {
 /** F12a forms library flag (read per request). Default OFF. */
 export function isFormsEnabled(source: EnvSource = process.env): boolean {
   return optionalTrimmed(source.FORMS_ENABLED) === "true";
+}
+
+/**
+ * F12a: public https origin that serves /public (template PDF). Config only,
+ * never the request Host (Cap review N6). FORMS_PUBLIC_BASE_URL, else the
+ * Vercel system var VERCEL_PROJECT_PRODUCTION_URL; null when neither is set
+ * (clients then resolve `template.path` against their API base).
+ */
+export function getFormsPublicBaseUrl(source: EnvSource = process.env): string | null {
+  const explicit = optionalTrimmed(source.FORMS_PUBLIC_BASE_URL);
+  const candidate = explicit ?? (optionalTrimmed(source.VERCEL_PROJECT_PRODUCTION_URL) ? `https://${optionalTrimmed(source.VERCEL_PROJECT_PRODUCTION_URL)}` : undefined);
+  if (!candidate) return null;
+  try {
+    const u = new URL(candidate);
+    return u.protocol === "https:" ? u.origin : null;
+  } catch {
+    return null;
+  }
 }
 
 export const ASK_DEFAULT_MODEL = "anthropic/claude-sonnet-4.5";

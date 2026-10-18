@@ -4,6 +4,8 @@
 -- content_hash = sha256 of the official PDF (73,317 bytes), computed 2026-10-18 from a fresh GET
 -- of official_url (HTTP 200, Last-Modified Sun, 12 Nov 2023 12:20:11 GMT); it matches the CSV.
 -- The same bytes ship as public/forms/formulario_nazionale_visti2.pdf (src/lib/forms/national-visa.ts).
+-- scope: the CSV says `us_post:new_york`; this row deliberately uses `US-consulate:new-york`, the
+-- F9 scope prefix every other consulate row uses. Do not "fix" it back to the CSV spelling.
 -- Apply scope: local + nomade-dev ONLY. NEVER nomade-prod.
 
 alter table internal.sources

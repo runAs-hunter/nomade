@@ -23,6 +23,13 @@ markers = {}
 for line in md:
     m = re.match(r'^\| Field (\d+) \| .* \| `([a-z0-9-]+)` \| (.*) \|$', line)
     if m: markers[int(m.group(1))] = (m.group(2), m.group(3))
+
+# Cap review of #40 (N1): internal workflow notes are not served to clients.
+INTERNAL_NOTES = [" Flagged for Cap.", " (Cap 2026-10-18)"]
+def public_reason(r):
+    for n in INTERNAL_NOTES: r = r.replace(n, "")
+    assert "Cap" not in r, r
+    return r
 assert sorted(markers) == list(range(1, 38))
 REFS = re.compile(r'\[(F-NY|F-C|NY-DNV)\]')
 def refs(s): 
@@ -42,7 +49,7 @@ for f in fields:
     out.append({
         "fieldId": str(n), "number": n, "page": f['page'],
         "labelIt": f['it'], "labelEn": f['en'], "asks": f['asks'],
-        "marker": mk, "markerReason": why, "ambiguous": amb,
+        "marker": mk, "markerReason": public_reason(why), "ambiguous": amb,
         "prefill": prefill,
         "prefillPart": {1: "familyName", 3: "givenName"}.get(n),
         "reminder": "arrivalMonth" if n == 29 else None,
@@ -143,7 +150,8 @@ export const FORMS_NAME_CHECK_NOTE =
 // ---------------------------------------------------------------------------
 
 export type FormRef = "F-NY" | "F-C" | "NY-DNV";
-export type PrefillKind = "accountName" | "arrivalMonth" | "consulate";
+/** Decision 7: only the account name is ever copied into a field (arrival month and consulate never are). */
+export type PrefillKind = "accountName";
 export type FieldMarker = "phase1-prefill" | "copy-only" | "never-prefill";
 
 export type FormField = {{
@@ -155,6 +163,7 @@ export type FormField = {{
   /** What the field asks for (verbatim, may contain [F-NY]/[F-C]/[NY-DNV] markers). */
   asks: string;
   marker: FieldMarker;
+  /** Walkthrough marker reason, internal notes ("Flagged for Cap.", "(Cap 2026-10-18)") stripped. */
   markerReason: string;
   /** Carries the lock sentence. Never prefilled. */
   ambiguous: boolean;

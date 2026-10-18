@@ -71,7 +71,8 @@ export const FORMS_NAME_CHECK_NOTE =
 // ---------------------------------------------------------------------------
 
 export type FormRef = "F-NY" | "F-C" | "NY-DNV";
-export type PrefillKind = "accountName" | "arrivalMonth" | "consulate";
+/** Decision 7: only the account name is ever copied into a field (arrival month and consulate never are). */
+export type PrefillKind = "accountName";
 export type FieldMarker = "phase1-prefill" | "copy-only" | "never-prefill";
 
 export type FormField = {
@@ -83,6 +84,7 @@ export type FormField = {
   /** What the field asks for (verbatim, may contain [F-NY]/[F-C]/[NY-DNV] markers). */
   asks: string;
   marker: FieldMarker;
+  /** Walkthrough marker reason, internal notes ("Flagged for Cap.", "(Cap 2026-10-18)") stripped. */
   markerReason: string;
   /** Carries the lock sentence. Never prefilled. */
   ambiguous: boolean;
@@ -663,7 +665,7 @@ export const NATIONAL_VISA_FIELDS: FormField[] = [
     "labelEn": "Employer and employer's address and telephone number. For students, name and address of school",
     "asks": "The employer's name, address and phone number, or the school's for students. [F-NY] The form gives no instruction for applicants without an employer (for example, self-employed people). This depends on your situation. Check your consulate's instructions or ask a qualified immigration professional.",
     "marker": "never-prefill",
-    "markerReason": "Carries the lock sentence (Cap 2026-10-18).",
+    "markerReason": "Carries the lock sentence.",
     "ambiguous": true,
     "prefill": null,
     "prefillPart": null,
@@ -684,7 +686,7 @@ export const NATIONAL_VISA_FIELDS: FormField[] = [
     "labelEn": "Main purpose(s) of the journey: family reunion visa; religious reasons; sport; mission; diplomatic; medical reasons; study; adoption; subordinate work; self-employment; other (please specify)",
     "asks": "A tick box for the main purpose of the journey. These are the only options printed. Neither form has a \"digital nomad\" or \"remote worker\" option. [F-NY][F-C] Nomade does not pick this box. This depends on your situation. Check your consulate's instructions or ask a qualified immigration professional.",
     "marker": "never-prefill",
-    "markerReason": "The purpose-of-journey box is a legal choice. Never prefilled (Cap 2026-10-18).",
+    "markerReason": "The purpose-of-journey box is a legal choice. Never prefilled.",
     "ambiguous": true,
     "prefill": null,
     "prefillPart": null,
@@ -854,7 +856,7 @@ export const NATIONAL_VISA_FIELDS: FormField[] = [
     "labelEn": "Intended date of arrival in the Schengen area",
     "asks": "Your intended arrival date in the Schengen area. [F-NY]",
     "marker": "copy-only",
-    "markerReason": "Asks for a full arrival date. Phase 1 holds only a month, so it cannot prefill this field without adding a day. Flagged for Cap.",
+    "markerReason": "Asks for a full arrival date. Phase 1 holds only a month, so it cannot prefill this field without adding a day.",
     "ambiguous": false,
     "prefill": null,
     "prefillPart": null,
@@ -901,7 +903,7 @@ export const NATIONAL_VISA_FIELDS: FormField[] = [
     "labelEn": "Surname and name of the person in Italy who applied for \"family reunion\" or of the employer in Italy. For adoption, religious reasons, medical reasons, sport, study, mission: the address in Italy. Address and e-mail; telephone or fax",
     "asks": "The family-reunion sponsor or the employer in Italy, with their address, e-mail and phone/fax. For the purposes the form lists, it asks for an address in Italy. [F-NY] The form does not mention digital nomad or remote worker applicants. This depends on your situation. Check your consulate's instructions or ask a qualified immigration professional.",
     "marker": "never-prefill",
-    "markerReason": "Carries the lock sentence (Cap 2026-10-18).",
+    "markerReason": "Carries the lock sentence.",
     "ambiguous": true,
     "prefill": null,
     "prefillPart": null,
@@ -943,7 +945,7 @@ export const NATIONAL_VISA_FIELDS: FormField[] = [
     "labelEn": "Cost of travelling and living during the applicant's stay is covered by: myself / a sponsor (host, company, organisation), please specify; means of support: cash, traveller's cheques, credit card, prepaid accommodation, prepaid transport, other; [sponsor] referred to in 31 or 32; accommodation provided; all expenses covered during the stay",
     "asks": "Who covers the costs of travel and stay, and the means of support, as tick boxes. The form prints: \"INDICAZIONE NON NECESSARIA NEL CASO DI VISTO PER: Ricongiungimento Familiare, Familiare al Seguito, Lavoro Subordinato/Autonomo, Missione, Diplomatico, Adozione\" (\"Information not necessary if applying for: family reunion / subordinate work / self-employment / mission / diplomatic / adoption\"). [F-NY][F-C] Whether that note covers your visa is not stated on the form. This depends on your situation. Check your consulate's instructions or ask a qualified immigration professional.",
     "marker": "never-prefill",
-    "markerReason": "Carries the lock sentence (Cap 2026-10-18).",
+    "markerReason": "Carries the lock sentence.",
     "ambiguous": true,
     "prefill": null,
     "prefillPart": null,

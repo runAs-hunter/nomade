@@ -6,7 +6,7 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 - **Source row (gate V1).** `us-new-york-national-visa-form` in `internal.sources` (migration `20261018102516_f12a_national_visa_form_source.sql`). It comes from `docs/sources/F12-visa-form-source.csv` and is mapped to `submit-application`. Its `content_hash` is the sha256 of the official PDF. The migration also adds `internal.sources.needs_review`.
 - **Content.** `src/lib/forms/national-visa.ts` holds the content, with `FORMS_CONTENT_VERSION`. It is generated verbatim from `docs/forms/visa-form-walkthrough.md` by `scripts/gen-forms-content.py`.
 - **Template.** `public/forms/formulario_nazionale_visti2.pdf` is the official file, byte-for-byte. It has no AcroForm, so iOS draws at anchors.
-- **Link check.** `GET|POST /api/cron/check-sources` is extended with the pinned-hash compare (decision 6; see docs/sources.md). Since Cap's 18 Oct decision it is scheduled monthly in `vercel.json` (`0 5 1 * *` UTC), and it can still be triggered by hand.
+- **Link check.** `GET|POST /api/cron/check-sources` is extended with the pinned-hash compare (decision 6; see docs/sources.md). Since Cap's 18 Oct decision it is scheduled monthly in `vercel.json` (`0 4 1 * *` UTC) in **forms-only** mode: it checks the pinned form PDF only and never auto-stales other sources. A changed verified PDF (content-type `application/pdf` + `%PDF-` magic) or a 404/410/DNS failure sets `needs_review`; the pinned row is never staled, so the free walkthrough stays up. It can still be triggered by hand (full check without `?formsOnly=1`).
 - **API.** `GET /api/forms` and `GET /api/forms/:formId`, behind `requireAccess` and the active-account check. Both are flagged by `FORMS_ENABLED`, which defaults to off.
 
 ## SHA-256 (gate V1)
@@ -18,12 +18,24 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 ## Locks
 - **No new data collection.** The API takes no form input, and form values never reach the server.
 - **Consulate variants (Cap, 18 Oct).** Only `?consulate=new-york` gets the NY-headed PDF, template, source card and prefill. Every other post gets the walkthrough labelled "Based on the New York version of the form" plus a link to its own F5 `instructionUrl`, and no PDF. The consulate comes from the query param only; nothing is stored.
-- **Cap-approved copy (18 Oct).** The field 29 reminder, the name check (from the 0.3 Jane Sample) and the variant label sit in a marked block in `national-visa.ts`, outside the verbatim walkthrough content.
-- **Prefill is device-side and copy-only.** Only fields 1 and 3 are prefilled, from the account name. Field 29 gets a margin reminder of the F11a arrival month, never a value. No field takes the consulate.
+- **Cap-approved copy (18 Oct).** The field 29 reminder, the name check (from the 0.3 Jane Sample) and the variant label sit in a marked block in `national-visa.ts`, outside the verbatim walkthrough content. The block lives in the generator template (`scripts/gen-forms-content.py`), so a regeneration keeps it.
+- **Paid pre-fill is client-enforced only (N9, by design — decision 2).** The template is a public static file and the name stays on the device, so `access: "paid"` is honoured by the app; the server cannot enforce it.
+- **Template URL from config.** `template.url` uses `FORMS_PUBLIC_BASE_URL` (else `VERCEL_PROJECT_PRODUCTION_URL`), never the request Host; `null` if neither, with `template.path` always present.
+- **Prefill is device-side and copy-only.** Only fields 1 and 3 are prefilled, from the account name (`PrefillKind = "accountName"`, enforced at compile time). Field 29 gets a margin reminder of the F11a arrival month, never a value. No field takes the consulate.
 - **No prefill on ambiguous fields.** These are the fields that carry the lock sentence.
 - **Byte-exact strings:** the disclaimer `Preliminary guidance — not legal advice` and the translation label.
 - **Logs** carry ids, counts, `access` and `needsReview` only.
 - **Database:** nomade-dev only. Never nomade-prod.
+
+## Rev 3 changes (since rev 2; Cap's review of #40, 18 Oct 2026)
+- **`variant` gains the scope:** `variant { postId: "new-york", templateScope: "US-consulate:new-york", prefillPosts: ["new-york"], matchesConsulate, label }`, in list items and detail. Only a post in `prefillPosts` gets the PDF and pre-fill; the phone hides both for every other post and shows that post's own `consulate.officialUrl`. The server still strips the PDF, template and anchors for non-NY (rev 2), so this is belt and braces.
+- **`template.url`** now comes from config (`FORMS_PUBLIC_BASE_URL`, else Vercel's `VERCEL_PROJECT_PRODUCTION_URL`), never the request host. It is **`null`** when neither is set. A new **`template.path`** (`"/forms/formulario_nazionale_visti2.pdf"`) is always present: when `url` is null, resolve `path` against the API base URL. Always verify `sha256`.
+- **`markerReason`** no longer contains internal workflow notes ("Flagged for Cap.", "(Cap 2026-10-18)"). iOS does not need to render it.
+- **`prefill`** on fields is typed `"accountName" | null` only (arrival month and consulate can never be prefilled).
+- **A moved or deleted NY PDF no longer hides the form.** The monthly check flags it `needs_review` instead of staling the row, so the API keeps serving the walkthrough with `prefill.reason: "needs_review"` and the stale notice. `503 FORM_SOURCE_UNAVAILABLE` now only happens if Visa Ops deactivates the row by hand.
+- **Paid pre-fill is client-enforced (N9, by design, decision 2).** The template is a public static file and the name lives on the device, so the server cannot enforce `access: "paid"`. iOS must honour `access`.
+- **Naming (N5):** the field-level/source `needsReview` (the `needs_review` column) is not the link-check summary's `needsReview` count; see docs/sources.md.
+- **Unchanged:** every rev 2 key and value; `copy` (the Cap-approved notes, kept in the generator template so a regeneration keeps them); `reminder: "arrivalMonth"`.
 
 ## Rev 2 changes (since rev 1)
 - **New query param `?consulate=<postId>`** on both endpoints. It takes the F5 US post ids, the same values the app already sends to `/api/ask` as `consulatePostId`: `washington`, `boston`, `chicago`, `detroit`, `houston`, `los-angeles`, `miami`, `new-york`, `philadelphia`, `san-francisco`.
@@ -71,7 +83,7 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
     "contentVersion": "visa-ops-national-visa-2026-10-18",
     "available": true,
     "needsReview": false,
-    "variant": { "postId": "new-york", "matchesConsulate": true, "label": null },
+    "variant": { "postId": "new-york", "templateScope": "US-consulate:new-york", "prefillPosts": ["new-york"], "matchesConsulate": true, "label": null },
     "pdfAvailable": true                     // false unless consulate=new-york and the row is active
   }],
   "disclaimer": "Preliminary guidance — not legal advice",
@@ -92,7 +104,7 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
   "disclaimer": "Preliminary guidance — not legal advice",                      // byte-exact
   "translationLabel": "English translation — for understanding only. Submit the Italian original.", // byte-exact; top of translation + every page
   "lockSentence": "This depends on your situation. Check your consulate's instructions or ask a qualified immigration professional.",
-  "variant": { "postId": "new-york", "matchesConsulate": true, "label": null },
+  "variant": { "postId": "new-york", "templateScope": "US-consulate:new-york", "prefillPosts": ["new-york"], "matchesConsulate": true, "label": null },
   "consulate": { "postId": "new-york",
                  "officialUrl": "https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/",
                  "host": "consnewyork.esteri.it" },              // null when no consulate param
@@ -114,7 +126,8 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
     "needsReview": false                      // decision 6 (monthly hash check)
   },
   "template": {                               // the official PDF, byte-for-byte, served by us; null for non-NY
-    "url": "https://<api-host>/forms/formulario_nazionale_visti2.pdf",   // public static file, no auth
+    "url": "https://<FORMS_PUBLIC_BASE_URL>/forms/formulario_nazionale_visti2.pdf",   // from config; null if unset → use path
+    "path": "/forms/formulario_nazionale_visti2.pdf",  // public static file, no auth; resolve against the API base when url is null
     "sha256": "d0631552d1e474c522911cc74d18c15fe474984ad79bd65ce3f5a880ee13ed20", // verify after download
     "bytes": 73317, "pages": 4,
     "pageSize": { "width": 612, "height": 792 },  // PDF points, US Letter
@@ -128,7 +141,7 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
     "labelIt": "Cognome (x)", "labelEn": "Surname",
     "asks": "Your surname, as shown in the travel document (note x). [F-NY]",
     "marker": "phase1-prefill",              // phase1-prefill | copy-only | never-prefill
-    "markerReason": "…",
+    "markerReason": "…",                     // walkthrough reason, internal notes stripped; iOS need not render it
     "ambiguous": false,                      // true → asks contains lockSentence; never prefilled
     "prefill": "accountName",                // accountName | null  (only fields 1 and 3)
     "prefillPart": "familyName",             // field 1 familyName, field 3 givenName, else null
@@ -153,7 +166,7 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
 ### Non-NY consulate (or no `consulate` param)
 ```jsonc
 {
-  "variant": { "postId": "new-york", "matchesConsulate": false, "label": "Based on the New York version of the form" },
+  "variant": { "postId": "new-york", "templateScope": "US-consulate:new-york", "prefillPosts": ["new-york"], "matchesConsulate": false, "label": "Based on the New York version of the form" },
   "consulate": { "postId": "chicago", "officialUrl": "https://conschicago.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/how-to-schedule-an-appointment/", "host": "conschicago.esteri.it" },  // null if no param
   "source": null,
   "template": null,
@@ -166,6 +179,8 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
 ```
 
 ### Rules for iOS
+- **NY-only PDF:** offer the PDF and pre-fill only when the device's post id is in `variant.prefillPosts` **and** `template` is non-null. Otherwise show `variant.label` and `consulate.officialUrl`.
+- **Paid pre-fill is enforced by the app** (the server cannot: the template is public and the name is on the device). Honour `access`.
 - **Send the consulate:** always send `?consulate=<the device's post id>`. Omit it when the post is unresolved.
 - **Non-NY users:** when `variant.matchesConsulate == false`, show `variant.label` above the walkthrough. Show a link to `consulate.officialUrl` (when present) as the user's own consulate page, and show no PDF and no pre-fill button. Never cache the NY template for a non-NY user.
 - **Name check:** show `copy.nameCheck` beside fields 1 and 3 when they are pre-filled.

@@ -81,12 +81,13 @@ Errors: `{ error: { code, message, requestId } }` + `x-request-id`.
 
 ## Monthly refresh — `GET|POST /api/cron/check-sources`
 
-`Authorization: Bearer ${CRON_SECRET}` (purge-accounts pattern). **F12a (Cap, 18 Oct 2026):** `vercel.json` schedules it monthly, `0 5 1 * *` UTC (05:00 UTC on the 1st). Vercel crons fire on Production only and send the bearer automatically; Isaias approves the schedule by merging. Manual calls still work.
+`Authorization: Bearer ${CRON_SECRET}` (purge-accounts pattern). **F12a (Cap, 18 Oct 2026):** `vercel.json` schedules it monthly, `0 4 1 * *` UTC (04:00 UTC on the 1st), in **forms-only mode** (Cap review of #40): the scheduled run checks only pinned form PDFs and never auto-stales any other source — the full F8 check stays manual, as F8 intended. Forms-only is selected for Vercel Cron calls (user-agent `vercel-cron/…`; the bearer is still required) and by `?formsOnly=1`. Vercel crons fire on Production only and send the bearer automatically; Isaias approves the schedule by merging. Manual calls without `?formsOnly` run the full check as before.
 
 | Query | Effect |
 |---|---|
 | `?dryRun=1` | Probe only; **no DB writes**. Use first every month. |
 | `?hash=1` | GET + `sha256` the body; store `content_hash`; report `hashChanged`. |
+| `?formsOnly=1` | F12a. Pinned form rows only (implied for Vercel Cron). |
 
 Per active row (4 concurrent, 15 s timeout, `maxDuration = 60`):
 
@@ -106,9 +107,21 @@ Per active row (4 concurrent, 15 s timeout, `maxDuration = 60`):
    Final-URL host change (ignoring `www.`) → `hostChanged: true` flag only. Hash change → `hashChanged: true` flag only (consulate HTML churns).
 3. Non-dry-run writes **operational columns only**: `last_checked_at`, `last_http_status`, `content_hash` (hash mode), `status = 'stale'` (hard failures). Update guarded by `status = 'active'`. Never touches title / URL / notes / curation fields.
 
-**F12a pinned forms:** rows in `FORM_TEMPLATE_PINS` (src/lib/forms/registry.ts) are always fetched with `GET` and hashed, even without `?hash=1`. A sha256 that differs from the pin sets `needs_review = true` (status unchanged) and reports `formHashMismatch: true`. No hash (404, network error) never sets it.
+**F12a pinned forms:** rows in `FORM_TEMPLATE_PINS` (src/lib/forms/registry.ts) are always fetched with `GET` and hashed, even without `?hash=1`. Pinned rows are **never staled** (so the free walkthrough stays up):
 
-Response: `200 { ok, requestId, checkedAt, dryRun, hashed, checked, healthy, botBlocked, staleFlagged, needsReview, errors, hostChanged, hashChanged, formHashMismatch, writeFailures, results: [{ id, httpStatus, method, outcome, action, hostChanged, hashChanged, formHashMismatch?, networkError? }] }`. In dry-run, `staleFlagged` / `action: "mark_stale"` mean *would* stale.
+| Pinned PDF result | Effect |
+|---|---|
+| 2xx, verified PDF (`content-type: application/pdf` **and** body starts `%PDF-`), sha256 = pin | nothing |
+| 2xx, verified PDF, sha256 ≠ pin | `needs_review = true`, `formHashMismatch: true` |
+| 2xx but not a verified PDF (WAF page, soft 404) | `formFetchNotPdf: true`; no flag |
+| 404 / 410 / DNS failure | `needs_review = true`, `formMissing: true`, `action: "mark_needs_review"`; **not** stale |
+| 401/403/429/5xx/timeout | F8 outcome only; no flag |
+
+The compare is always against the pin (registry), not the row's stored `content_hash`.
+
+**Naming (Cap review N5):** the summary's `needsReview` **count** is the number of rows whose F8 *outcome* was `needs_review` (e.g. a 5xx) — it is **not** the `needs_review` **column**. Count column flags with `formHashMismatch + formMissing`.
+
+Response: `200 { ok, requestId, checkedAt, dryRun, hashed, checked, healthy, botBlocked, staleFlagged, needsReview, errors, hostChanged, hashChanged, formHashMismatch, formFetchNotPdf, formMissing, formsOnly, writeFailures, results: [{ id, httpStatus, method, outcome, action, hostChanged, hashChanged, formHashMismatch?, formFetchNotPdf?, formMissing?, networkError? }] }`. In dry-run, `staleFlagged` / `action: "mark_stale"` mean *would* stale.
 
 Why a browser-like UA **and** an allowlist: `prenotami.esteri.it` answers 403 to non-browser agents (e.g. curl's default UA) and 200 to browsers (verified 2026-10-08). The UA avoids most bot 403s; the allowlist guarantees a bot 403 never stales Prenot@Mi even if the WAF tightens.
 

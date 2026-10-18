@@ -52,10 +52,15 @@ const SUMMARY = {
   results: [{ id: "x-retired-test", httpStatus: 404, method: "GET", outcome: "dead", action: "mark_stale", hostChanged: false, hashChanged: false }],
 };
 
-const cronReq = (method: "GET" | "POST", query = "", auth: string | null = `Bearer ${CRON_SECRET}`) =>
+const cronReq = (
+  method: "GET" | "POST",
+  query = "",
+  auth: string | null = `Bearer ${CRON_SECRET}`,
+  ua?: string,
+) =>
   new Request(`http://localhost/api/cron/check-sources${query}`, {
     method,
-    headers: auth ? { authorization: auth } : {},
+    headers: { ...(auth ? { authorization: auth } : {}), ...(ua ? { "user-agent": ua } : {}) },
   });
 
 describe("/api/cron/check-sources (F8)", () => {
@@ -99,7 +104,24 @@ describe("/api/cron/check-sources (F8)", () => {
     const body = await res.json();
     expect(body).toMatchObject({ ok: true, dryRun: true, staleFlagged: 1, requestId: expect.any(String) });
     expect(body.results[0]).toMatchObject({ id: "x-retired-test", action: "mark_stale" });
-    expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: true, hash: false });
+    expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: true, hash: false, formsOnly: false });
+  });
+
+  it("F12a: Vercel Cron (user-agent vercel-cron/1.0) runs forms-only", async () => {
+    listActiveForCheck.mockResolvedValue({ ok: true, value: [] });
+    runSourceCheck.mockResolvedValue({ ...SUMMARY, dryRun: false, checked: 0, results: [] });
+    const res = await GET(cronReq("GET", "", `Bearer ${CRON_SECRET}`, "vercel-cron/1.0"));
+    expect(res.status).toBe(200);
+    expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: false, hash: false, formsOnly: true });
+  });
+
+  it("F12a: ?formsOnly=1 runs forms-only; Vercel Cron UA without the secret is still 401", async () => {
+    listActiveForCheck.mockResolvedValue({ ok: true, value: [] });
+    runSourceCheck.mockResolvedValue({ ...SUMMARY, dryRun: false, checked: 0, results: [] });
+    expect((await POST(cronReq("POST", "?formsOnly=1"))).status).toBe(200);
+    expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: false, hash: false, formsOnly: true });
+    const denied = await GET(cronReq("GET", "", null, "vercel-cron/1.0"));
+    expect(denied.status).toBe(401);
   });
 
   it("POST ?hash=true → hash flag on, dryRun off", async () => {
@@ -107,7 +129,7 @@ describe("/api/cron/check-sources (F8)", () => {
     runSourceCheck.mockResolvedValue({ ...SUMMARY, dryRun: false, hashed: true, checked: 0, results: [] });
     const res = await POST(cronReq("POST", "?hash=true"));
     expect(res.status).toBe(200);
-    expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: false, hash: true });
+    expect(runSourceCheck.mock.calls[0]![1]).toEqual({ dryRun: false, hash: true, formsOnly: false });
   });
 
   it("500 when listing fails", async () => {

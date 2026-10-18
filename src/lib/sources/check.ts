@@ -1,5 +1,5 @@
 /**
- * F8 monthly freshness check (vercel.json cron `0 5 1 * *` UTC since F12a; also manual).
+ * F8 monthly freshness check (vercel.json cron `0 4 1 * *` UTC since F12a; also manual).
  *
  * HEAD each active official_url (GET fallback), record status, optionally hash
  * the body, and mark `stale` ONLY on hard failures:
@@ -11,11 +11,16 @@
  * never stales. Host changes and hash changes are flagged, not staled
  * (consulate HTML embeds per-request tokens; hashes churn).
  *
- * F12a (decision 6): rows with a pinned form-template hash (`pinnedHashes`,
- * from src/lib/forms/registry.ts) are ALWAYS fetched with GET and hashed. If
- * the official PDF's sha256 differs from the pin, the row gets
- * `needs_review = true` (sticky: only Visa Ops clears it, via admin PATCH).
- * Status is not changed; a fetch that yields no hash changes nothing.
+ * F12a (decision 6; Cap review of #40): rows with a pinned form-template hash
+ * (`pinnedHashes`, from src/lib/forms/registry.ts) are ALWAYS fetched with GET
+ * and hashed, and are NEVER staled (so the free walkthrough stays up):
+ *   - 2xx that really is a PDF (content-type application/pdf AND `%PDF-`
+ *     magic bytes) with a sha256 ≠ pin → `needs_review = true`;
+ *   - 2xx that is not a PDF (WAF page, soft 404) → reported `formFetchNotPdf`,
+ *     no flag;
+ *   - 404/410/DNS death → `needs_review = true` (`formMissing`), not stale.
+ * `needs_review` is sticky: only Visa Ops clears it, via admin PATCH.
+ * `formsOnly` checks pinned rows only (the monthly vercel.json cron).
  *
  * Writes operational columns only. Never scrapes behind login / Prenot@Mi
  * queues: one unauthenticated HEAD/GET of the landing URL, no cookies.
@@ -53,6 +58,10 @@ export type ProbeResult = {
   method: "HEAD" | "GET";
   networkError?: ProbeNetworkError;
   contentHash?: string;
+  /** Hash mode: response content-type header (null when absent). */
+  contentType?: string | null;
+  /** Hash mode: content-type application/pdf AND body starts with `%PDF-`. */
+  isPdf?: boolean;
 };
 
 export type CheckOutcome =
@@ -73,7 +82,14 @@ export type Classification = {
 export type FetchLike = (
   input: string,
   init: RequestInit,
-) => Promise<Pick<Response, "status" | "url" | "body" | "arrayBuffer">>;
+) => Promise<Pick<Response, "status" | "url" | "body" | "arrayBuffer"> & Partial<Pick<Response, "headers">>>;
+
+const PDF_MAGIC = Buffer.from("%PDF-", "latin1");
+
+/** Vercel Cron invocations identify as `vercel-cron/1.0`. Auth is still CRON_SECRET. */
+export function isVercelCron(request: Request): boolean {
+  return /^vercel-cron\//i.test(request.headers.get("user-agent") ?? "");
+}
 
 function hostOf(url: string | null): string | null {
   if (!url) return null;
@@ -164,6 +180,12 @@ export async function probeUrl(
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.byteLength <= MAX_HASH_BYTES) {
         result.contentHash = `sha256:${createHash("sha256").update(buf).digest("hex")}`;
+        const contentType = res.headers?.get("content-type") ?? null;
+        result.contentType = contentType;
+        result.isPdf =
+          !!contentType &&
+          /^application\/pdf\b/i.test(contentType.trim()) &&
+          buf.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC);
       }
     } else {
       await discardBody(res);
@@ -202,11 +224,15 @@ export type CheckResultItem = {
   httpStatus: number;
   method: "HEAD" | "GET" | null;
   outcome: CheckOutcome;
-  action: "none" | "mark_stale";
+  action: "none" | "mark_stale" | "mark_needs_review";
   hostChanged: boolean;
   hashChanged: boolean;
   /** F12a: pinned form PDF hash differed → needs_review set. */
   formHashMismatch?: boolean;
+  /** F12a: pinned form URL answered 2xx but not with a PDF → no flag. */
+  formFetchNotPdf?: boolean;
+  /** F12a: pinned form URL is gone (404/410/DNS) → needs_review, never stale. */
+  formMissing?: boolean;
   networkError?: ProbeNetworkError;
   writeFailed?: boolean;
 };
@@ -224,6 +250,9 @@ export type CheckSummary = {
   hostChanged: number;
   hashChanged: number;
   formHashMismatch: number;
+  formFetchNotPdf: number;
+  formMissing: number;
+  formsOnly: boolean;
   writeFailures: number;
   results: CheckResultItem[];
 };
@@ -255,12 +284,14 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 /** Probe all rows; in non-dry-run mode persist operational columns. */
 export async function runSourceCheck(
   deps: RunCheckDeps,
-  opts: { dryRun: boolean; hash: boolean },
+  opts: { dryRun: boolean; hash: boolean; formsOnly?: boolean },
 ): Promise<CheckSummary> {
   const now = deps.now ?? (() => new Date());
   const checkedAt = now().toISOString();
+  const formsOnly = opts.formsOnly === true;
+  const rows = formsOnly ? deps.rows.filter((r) => !!deps.pinnedHashes?.[r.id]) : deps.rows;
 
-  const results = await mapLimit(deps.rows, deps.concurrency ?? DEFAULT_CONCURRENCY, async (row) => {
+  const results = await mapLimit(rows, deps.concurrency ?? DEFAULT_CONCURRENCY, async (row) => {
     const host = hostOf(row.official_url);
     if (!host || !isOfficialHost(host) || !row.official_url.startsWith("https://")) {
       const item: CheckResultItem = {
@@ -281,8 +312,14 @@ export async function runSourceCheck(
       timeoutMs: deps.timeoutMs,
       hash: opts.hash || !!pin,
     });
-    const formHashMismatch = !!pin && !!probe.contentHash && probe.contentHash !== `sha256:${pin}`;
-    const cls = classifyProbe(row.official_url, probe);
+    const raw = classifyProbe(row.official_url, probe);
+    const formFetchNotPdf = !!pin && !!probe.contentHash && probe.isPdf !== true;
+    const formHashMismatch =
+      !!pin && !!probe.contentHash && probe.isPdf === true && probe.contentHash !== `sha256:${pin}`;
+    // Pinned form rows are never staled: a gone PDF hides prefill, not the page.
+    const formMissing = !!pin && raw.markStale;
+    const cls = formMissing ? { ...raw, markStale: false } : raw;
+    const setNeedsReview = formHashMismatch || formMissing;
     const hashChanged =
       !!probe.contentHash && !!row.content_hash && probe.contentHash !== row.content_hash;
 
@@ -291,10 +328,10 @@ export async function runSourceCheck(
       httpStatus: probe.httpStatus,
       method: probe.method,
       outcome: cls.outcome,
-      action: cls.markStale ? "mark_stale" : "none",
+      action: cls.markStale ? "mark_stale" : setNeedsReview ? "mark_needs_review" : "none",
       hostChanged: cls.hostChanged,
       hashChanged,
-      ...(pin ? { formHashMismatch } : {}),
+      ...(pin ? { formHashMismatch, formFetchNotPdf, formMissing } : {}),
       ...(probe.networkError ? { networkError: probe.networkError } : {}),
     };
 
@@ -305,7 +342,7 @@ export async function runSourceCheck(
       };
       if (probe.contentHash) update.content_hash = probe.contentHash;
       if (cls.markStale) update.status = "stale";
-      if (formHashMismatch) update.needs_review = true;
+      if (setNeedsReview) update.needs_review = true;
       try {
         const res = await deps.applyUpdate(row.id, update);
         if (!res.ok) item.writeFailed = true;
@@ -330,6 +367,9 @@ export async function runSourceCheck(
     hostChanged: count((r) => r.hostChanged),
     hashChanged: count((r) => r.hashChanged),
     formHashMismatch: count((r) => !!r.formHashMismatch),
+    formFetchNotPdf: count((r) => !!r.formFetchNotPdf),
+    formMissing: count((r) => !!r.formMissing),
+    formsOnly,
     writeFailures: count((r) => !!r.writeFailed),
     results,
   };

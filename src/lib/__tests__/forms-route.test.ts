@@ -78,6 +78,8 @@ const NY_PDF = "https://consnewyork.esteri.it/wp-content/uploads/2023/06/formula
 
 beforeEach(() => {
   vi.stubEnv("FORMS_ENABLED", "true");
+  vi.stubEnv("FORMS_PUBLIC_BASE_URL", "https://nomade.example.test");
+  vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
   vi.stubEnv("BILLING_GATE_ENABLED", "false");
   db = makeDb(seed());
   verifyAccessToken.mockReset();
@@ -89,6 +91,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("GET /api/forms* (F12a)", () => {
+  it("no token with the flag ON → 401 (list and detail), nothing served (N12)", async () => {
+    verifyAccessToken.mockResolvedValueOnce({ ok: false, reason: "missing" });
+    verifyAccessToken.mockResolvedValueOnce({ ok: false, reason: "missing" });
+    const d = await getForm("national-visa", "");
+    expect(d.status).toBe(401);
+    const text = await d.text();
+    expect(text).not.toContain("formulario_nazionale_visti2.pdf");
+    expect((await LIST(req("/api/forms", ""))).status).toBe(401);
+  });
+
   it("no token → 401 even when the flag is off; flag off → 404 FORMS_DISABLED", async () => {
     vi.stubEnv("FORMS_ENABLED", "");
     verifyAccessToken.mockResolvedValueOnce({ ok: false, reason: "missing" });
@@ -122,10 +134,38 @@ describe("GET /api/forms* (F12a)", () => {
         contentVersion: "visa-ops-national-visa-2026-10-18",
         available: true,
         needsReview: false,
-        variant: { postId: "new-york", matchesConsulate: true, label: null },
+        variant: { postId: "new-york", templateScope: "US-consulate:new-york", prefillPosts: ["new-york"], matchesConsulate: true, label: null },
         pdfAvailable: true,
       },
     ]);
+  });
+
+  it("template URL comes from config, never the request host (Cap review N6)", async () => {
+    const hostile = await (
+      await GET_FORM(
+        new Request("https://evil.example.test/api/forms/national-visa?consulate=new-york", {
+          headers: { authorization: "Bearer good", host: "evil.example.test" },
+        }),
+        ctx("national-visa"),
+      )
+    ).json();
+    expect(hostile.template.url).toBe("https://nomade.example.test/forms/formulario_nazionale_visti2.pdf");
+
+    vi.stubEnv("FORMS_PUBLIC_BASE_URL", "");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "nomade-prod-alias.example.test");
+    const viaVercel = await (await getForm()).json();
+    expect(viaVercel.template.url).toBe("https://nomade-prod-alias.example.test/forms/formulario_nazionale_visti2.pdf");
+
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
+    const unset = await (await getForm()).json();
+    expect(unset.template.url).toBeNull();
+    expect(unset.template.path).toBe("/forms/formulario_nazionale_visti2.pdf");
+  });
+
+  it("variant scope: only prefillPosts get the PDF (Cap review item 1)", async () => {
+    const list = await (await LIST(req("/api/forms?consulate=new-york"))).json();
+    expect(list.forms[0].variant.prefillPosts).toEqual(["new-york"]);
+    expect(list.forms[0].variant.templateScope).toBe(list.forms[0].scope);
   });
 
   it("list: missing / non-active source → available false", async () => {
@@ -150,7 +190,8 @@ describe("GET /api/forms* (F12a)", () => {
       needsReview: false,
     });
     expect(b.template).toMatchObject({
-      url: "https://api.example.test/forms/formulario_nazionale_visti2.pdf",
+      url: "https://nomade.example.test/forms/formulario_nazionale_visti2.pdf",
+      path: "/forms/formulario_nazionale_visti2.pdf",
       sha256: NATIONAL_VISA_TEMPLATE.sha256,
       hasAcroForm: false,
       pages: 4,
@@ -158,7 +199,7 @@ describe("GET /api/forms* (F12a)", () => {
     expect(b.fields).toHaveLength(37);
     expect(b.fields).toEqual(JSON.parse(JSON.stringify(NATIONAL_VISA_FIELDS)));
     expect(b.prefill).toEqual({ available: true, reason: null, staleNotice: null });
-    expect(b.variant).toEqual({ postId: "new-york", matchesConsulate: true, label: null });
+    expect(b.variant).toEqual({ postId: "new-york", templateScope: "US-consulate:new-york", prefillPosts: ["new-york"], matchesConsulate: true, label: null });
     expect(b.consulate).toEqual({
       postId: "new-york",
       officialUrl: "https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/",
@@ -246,6 +287,8 @@ describe("GET /api/forms* (F12a)", () => {
         const b = await res.json();
         expect(b.variant).toEqual({
           postId: "new-york",
+          templateScope: "US-consulate:new-york",
+          prefillPosts: ["new-york"],
           matchesConsulate: false,
           label: "Based on the New York version of the form",
         });

@@ -60,9 +60,32 @@ function internal(requestId: string, message: string): NextResponse {
 }
 
 /** GET /api/forms */
+/** Error class name only — messages can carry upstream detail, so they are not logged. */
+function errorName(err: unknown): string {
+  return err instanceof Error ? err.name : typeof err;
+}
+
+async function safeGate(request: Request, failMessage: string, route: string): Promise<Gate | NextResponse> {
+  try {
+    return await gate(request, failMessage);
+  } catch (err) {
+    return gateFailed(request, route, err);
+  }
+}
+
+function gateFailed(request: Request, route: string, err: unknown): NextResponse {
+  const requestId = getRequestId(request);
+  log.child({ requestId }).error("forms gate threw", {
+    code: ERROR_CODES.INTERNAL_ERROR,
+    route,
+    errorName: errorName(err),
+  });
+  return internal(requestId, "Unexpected forms failure");
+}
+
 export async function handleFormsList(request: Request): Promise<NextResponse> {
-  const g = await gate(request, "forms list unauthenticated").catch(() => null);
-  if (!g) return internal(getRequestId(request), "Unexpected forms failure");
+  const g = await safeGate(request, "forms list unauthenticated", "list");
+  if (g instanceof NextResponse) return g;
   if (!g.ok) return g.response;
   try {
     const consulate = parseConsulateParam(new URL(request.url));
@@ -75,16 +98,16 @@ export async function handleFormsList(request: Request): Promise<NextResponse> {
     const forms = buildFormList(rows.rows, consulate.postId);
     g.logger.info("forms list ok", { userId: g.userId, count: forms.length, available: forms.filter((f) => f.available).length });
     return withRequestId({ forms, disclaimer: FORMS_DISCLAIMER, requestId: g.requestId }, 200, g.requestId);
-  } catch {
-    g.logger.error("forms list threw", { code: ERROR_CODES.INTERNAL_ERROR });
+  } catch (err) {
+    g.logger.error("forms list threw", { code: ERROR_CODES.INTERNAL_ERROR, errorName: errorName(err) });
     return internal(g.requestId, "Unexpected forms failure");
   }
 }
 
 /** GET /api/forms/:formId */
 export async function handleFormGet(request: Request, formId: string): Promise<NextResponse> {
-  const g = await gate(request, "form get unauthenticated").catch(() => null);
-  if (!g) return internal(getRequestId(request), "Unexpected forms failure");
+  const g = await safeGate(request, "form get unauthenticated", "detail");
+  if (g instanceof NextResponse) return g;
   if (!g.ok) return g.response;
   try {
     const def = getFormDef(formId);
@@ -108,14 +131,8 @@ export async function handleFormGet(request: Request, formId: string): Promise<N
         status: 503,
       });
     }
-    const entitlement = await loadFormEntitlement(g.service, g.userId);
-    const view = buildFormView({
-      def,
-      row,
-      entitlement,
-      origin: new URL(request.url).origin,
-      consulatePostId: consulate.postId,
-    });
+    const entitlement = await loadFormEntitlement(g.service, g.userId, g.logger);
+    const view = buildFormView({ def, row, entitlement, consulatePostId: consulate.postId });
     g.logger.info("form get ok", {
       userId: g.userId,
       formId: def.formId,
@@ -126,8 +143,8 @@ export async function handleFormGet(request: Request, formId: string): Promise<N
       access: view.access,
     });
     return withRequestId({ ...view, requestId: g.requestId }, 200, g.requestId);
-  } catch {
-    g.logger.error("form get threw", { code: ERROR_CODES.INTERNAL_ERROR });
+  } catch (err) {
+    g.logger.error("form get threw", { code: ERROR_CODES.INTERNAL_ERROR, errorName: errorName(err) });
     return internal(g.requestId, "Unexpected forms failure");
   }
 }

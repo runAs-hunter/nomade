@@ -80,7 +80,10 @@ describe("F12a national visa form content", () => {
   });
 
   it("copy is verbatim from the Visa Ops walkthrough", () => {
-    for (const s of ALL_TEXT) expect(MD, s.slice(0, 60)).toContain(s);
+    // markerReason is served with the walkthrough's internal notes stripped (Cap review N1).
+    const MD_PUBLIC = MD.replaceAll(" Flagged for Cap.", "").replaceAll(" (Cap 2026-10-18)", "");
+    for (const s of ALL_TEXT) expect(MD_PUBLIC, s.slice(0, 60)).toContain(s);
+    for (const f of NATIONAL_VISA_FIELDS) expect(f.markerReason).not.toMatch(/\bCap\b|Flagged/);
     for (const f of NATIONAL_VISA_FIELDS) {
       expect(MD).toContain(`| ${f.number} | ${f.labelIt} | ${f.labelEn} | ${f.asks} |`);
     }
@@ -128,6 +131,20 @@ describe("F12a national visa form content", () => {
 
   it("never tells the user what to answer", () => {
     for (const s of ALL_TEXT) expect(s).not.toMatch(/\byou should\b|\bwe recommend\b|\bthe right (box|answer)\b|\b(tick|select|choose) (the|this) box\b/i);
+  });
+
+  it("only the account name is ever prefilled (PrefillKind narrowed; arrival month / consulate never)", () => {
+    const kinds = new Set(NATIONAL_VISA_FIELDS.map((f) => f.prefill).filter((k) => k !== null));
+    expect([...kinds]).toEqual(["accountName"]);
+    expect(NATIONAL_VISA_FIELDS.filter((f) => f.prefill).map((f) => f.number)).toEqual([1, 3]);
+    const src = readFileSync(path.join(ROOT, "src/lib/forms/national-visa.ts"), "utf8");
+    expect(src).toContain('export type PrefillKind = "accountName";');
+  });
+
+  it("field 29 / name-check notes come from the generator template (survive regeneration)", () => {
+    const gen = readFileSync(path.join(ROOT, "scripts/gen-forms-content.py"), "utf8");
+    expect(gen).toContain(FORMS_ARRIVAL_REMINDER);
+    expect(gen).toContain(FORMS_NAME_CHECK_NOTE);
   });
 
   it("template PDF in the repo matches the pinned sha256 (gate V1), the migration and the CSV", () => {
@@ -179,7 +196,7 @@ describe("F12a national visa form content", () => {
     const vercel = JSON.parse(readFileSync(path.join(ROOT, "vercel.json"), "utf8")) as {
       crons: { path: string; schedule: string }[];
     };
-    expect(vercel.crons).toContainEqual({ path: "/api/cron/check-sources", schedule: "0 5 1 * *" });
+    expect(vercel.crons).toContainEqual({ path: "/api/cron/check-sources", schedule: "0 4 1 * *" });
     expect(vercel.crons).toContainEqual({ path: "/api/cron/purge-accounts", schedule: "0 4 * * *" });
   });
 });

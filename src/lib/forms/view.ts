@@ -6,7 +6,7 @@
 
 import type { AccountDbClient } from "@/lib/account/export";
 import { hasActiveJourneyFull } from "@/lib/billing/entitlements";
-import { isBillingGateEnabled } from "@/lib/env";
+import { getFormsPublicBaseUrl, isBillingGateEnabled } from "@/lib/env";
 import {
   FORMS_ARRIVAL_MONTH_PLACEHOLDER,
   FORMS_ARRIVAL_REMINDER,
@@ -35,7 +35,7 @@ import {
 import { FORMS, type FormDef } from "@/lib/forms/registry";
 import { JOURNEY_DISCLAIMER } from "@/lib/journey/catalog";
 import { sourceHost } from "@/lib/journey/checklist-sources";
-import { log } from "@/lib/log";
+import type { Logger } from "@/lib/log";
 
 /** Byte-for-byte (Cap lock). */
 export const FORMS_DISCLAIMER = JOURNEY_DISCLAIMER;
@@ -100,10 +100,17 @@ export function servesTemplate(postId: UsConsulatePostId | null): boolean {
   return postId === NATIONAL_VISA_VARIANT_POST_ID;
 }
 
+/** Posts whose users may get the template PDF and prefill (Cap review of #40). */
+export const NATIONAL_VISA_PREFILL_POSTS: readonly UsConsulatePostId[] = [NATIONAL_VISA_VARIANT_POST_ID];
+
 export function variantView(postId: UsConsulatePostId | null) {
   const matches = servesTemplate(postId);
   return {
     postId: NATIONAL_VISA_VARIANT_POST_ID,
+    /** `US-consulate:<post>` scope of the template PDF (matches the source row). */
+    templateScope: `US-consulate:${NATIONAL_VISA_VARIANT_POST_ID}`,
+    /** Only these posts get the PDF + prefill; the phone hides both for every other post. */
+    prefillPosts: [...NATIONAL_VISA_PREFILL_POSTS],
     matchesConsulate: matches,
     label: matches ? null : FORMS_NY_VARIANT_LABEL,
   };
@@ -154,11 +161,12 @@ export function pdfAccess(ent: FormEntitlement): "free" | "paid" {
 export async function loadFormEntitlement(
   service: AccountDbClient,
   userId: string,
+  logger: Logger,
 ): Promise<FormEntitlement> {
   const gateEnabled = isBillingGateEnabled();
   const ent = await hasActiveJourneyFull(service, userId);
   if (!ent.ok) {
-    log.warn("forms entitlement unavailable", { userId });
+    logger.warn("forms entitlement unavailable", { userId });
     return { journeyFull: false, gateEnabled, unavailable: true };
   }
   return { journeyFull: ent.active, gateEnabled };
@@ -182,10 +190,12 @@ export function buildFormView(args: {
   def: FormDef;
   row: FormSourceRow;
   entitlement: FormEntitlement;
-  origin: string;
   consulatePostId: UsConsulatePostId | null;
+  /** Config origin (getFormsPublicBaseUrl); never the request host. */
+  publicBaseUrl?: string | null;
 }) {
-  const { def, row, entitlement, origin, consulatePostId } = args;
+  const { def, row, entitlement, consulatePostId } = args;
+  const publicBaseUrl = args.publicBaseUrl === undefined ? getFormsPublicBaseUrl() : args.publicBaseUrl;
   const needsReview = row.needs_review === true;
   const pdf = servesTemplate(consulatePostId);
   const prefillAvailable = pdf && !needsReview;
@@ -216,7 +226,9 @@ export function buildFormView(args: {
       : null,
     template: pdf
       ? {
-          url: new URL(NATIONAL_VISA_TEMPLATE.path, origin).toString(),
+          /** Absolute URL from config; null → resolve `path` against the API base. */
+          url: publicBaseUrl ? new URL(NATIONAL_VISA_TEMPLATE.path, publicBaseUrl).toString() : null,
+          path: NATIONAL_VISA_TEMPLATE.path,
           sha256: NATIONAL_VISA_TEMPLATE.sha256,
           bytes: NATIONAL_VISA_TEMPLATE.bytes,
           pages: NATIONAL_VISA_TEMPLATE.pages,
