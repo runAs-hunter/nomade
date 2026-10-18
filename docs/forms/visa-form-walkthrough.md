@@ -15,7 +15,7 @@ Lock sentence, used on every ambiguous field:
 |---|---|---|---|
 | [F-NY] | "Domanda di visto Nazionale (D)" with the "Consolato Generale d'Italia New York" header. Bilingual IT/EN, 4 pages. Linked on 2026-10-18 from the NY "Visas forms" page as "Long term Visa Application Form" | https://consnewyork.esteri.it/wp-content/uploads/2023/06/formulario_nazionale_visti2.pdf | d0631552d1e474c522911cc74d18c15fe474984ad79bd65ce3f5a880ee13ed20 |
 | [F-C] | "Domanda di visto Nazionale (D) — Modulo gratuito", central MAECI copy. Italian only, 4 pages | https://vistoperitalia.esteri.it/files/public/moduli/it/Formulario_Visto_Nazionale.pdf | d1d61879b3df549fad0ea0c756a2357c28b3e88d91149a0e82dfb6535f27a880 |
-| [NY-DNV] | NY Digital Nomad / Remote Worker visa page (active row `us-new-york-dnv`) | https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/visas-to-enter-italy/digital-nomad-remote-worker-visa/ | page read 2026-10-18 |
+| [NY-DNV] | Consulate General of Italy in New York: Digital Nomad / Remote Worker visa page | https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/visas-to-enter-italy/digital-nomad-remote-worker-visa/ | page read 2026-10-18 |
 
 Neither form prints a version or revision date (see `visa-form-source.csv`). Fields 1–37 use the same numbers and the same Italian labels on [F-NY] and [F-C]. Where the two differ, the difference is noted.
 

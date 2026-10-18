@@ -8,8 +8,8 @@
  * put. Not legal advice. Form values never reach the server (decision 2).
  */
 
-/** Bumped whenever the served copy changes. "-2": Visa Ops sign-off wording (18 Oct 2026). */
-export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-2";
+/** Bumped whenever the served copy changes. "-2": Visa Ops sign-off wording; "-3": Visa Ops [NY-DNV] citation reworded (18 Oct 2026). */
+export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-3";
 
 export const NATIONAL_VISA_FORM_ID = "national-visa";
 
@@ -134,7 +134,7 @@ export const NATIONAL_VISA_REFERENCES: Record<FormRef, FormReference> = {
   },
   "NY-DNV": {
     sourceId: "us-new-york-dnv",
-    label: "NY Digital Nomad / Remote Worker visa page (active row `us-new-york-dnv`)",
+    label: "Consulate General of Italy in New York: Digital Nomad / Remote Worker visa page",
     url: "https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/visas-to-enter-italy/digital-nomad-remote-worker-visa/",
   },
 };
