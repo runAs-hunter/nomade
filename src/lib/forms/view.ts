@@ -11,6 +11,7 @@ import {
   FORMS_ARRIVAL_MONTH_PLACEHOLDER,
   FORMS_ARRIVAL_REMINDER,
   FORMS_LOCK_SENTENCE,
+  FORMS_LOCKED_INTRO_TEXT,
   FORMS_NAME_CHECK_NOTE,
   FORMS_NY_VARIANT_LABEL,
   FORMS_STALE_NOTICE,
@@ -255,9 +256,9 @@ export function buildFormView(args: {
           arrivalReminder: FORMS_ARRIVAL_REMINDER,
           arrivalMonthPlaceholder: FORMS_ARRIVAL_MONTH_PLACEHOLDER,
         },
-    /** Locked: only the "What this is (and isn't)" disclaimer, not the label/translation notes. */
+    /** Locked: "What this is (and isn't)" with the Cap-approved locked text (no walkthrough on this view). */
     intro: locked
-      ? { title: NATIONAL_VISA_INTRO.title, text: NATIONAL_VISA_INTRO.text }
+      ? { title: NATIONAL_VISA_INTRO.title, text: FORMS_LOCKED_INTRO_TEXT }
       : NATIONAL_VISA_INTRO,
     sections: locked ? [] : NATIONAL_VISA_SECTIONS,
     fields: locked ? [] : fieldsFor(pdf),

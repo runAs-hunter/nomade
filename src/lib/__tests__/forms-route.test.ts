@@ -16,6 +16,7 @@ import { GET as GET_FORM } from "@/app/api/forms/[formId]/route";
 import {
   FORMS_ARRIVAL_REMINDER,
   FORMS_LOCK_SENTENCE,
+  FORMS_LOCKED_INTRO_TEXT,
   FORMS_NAME_CHECK_NOTE,
   FORMS_STALE_NOTICE,
   FORMS_TRANSLATION_LABEL,
@@ -277,7 +278,10 @@ describe("GET /api/forms* (F12a)", () => {
     });
     expect(b.references["F-NY"].url).toBe(NY_PDF);
     expect(b.disclaimer).toBe("Preliminary guidance — not legal advice");
-    expect(b.intro).toEqual({ title: NATIONAL_VISA_INTRO.title, text: NATIONAL_VISA_INTRO.text });
+    expect(b.intro).toEqual({ title: NATIONAL_VISA_INTRO.title, text: FORMS_LOCKED_INTRO_TEXT });
+    expect(FORMS_LOCKED_INTRO_TEXT).toBe(
+      "This page links the official form. Pro adds a field-by-field walkthrough and English translation.",
+    );
     // Pro: walkthrough, translation, markers, stamps, prefill, template, cover-page copy.
     expect(b.fields).toEqual([]);
     expect(b.sections).toEqual([]);
@@ -298,6 +302,7 @@ describe("GET /api/forms* (F12a)", () => {
       ...NATIONAL_VISA_SECTIONS.map((s) => s.text),
       NATIONAL_VISA_STAMPS.title,
       ...NATIONAL_VISA_STAMPS.items,
+      NATIONAL_VISA_INTRO.text, // the free-view "This walkthrough says…" intro (locked view has its own)
       NATIONAL_VISA_INTRO.labelsNote,
       NATIONAL_VISA_INTRO.translationNote,
       FORMS_TRANSLATION_LABEL,
@@ -411,6 +416,50 @@ describe("GET /api/forms* (F12a)", () => {
       }
     },
   );
+
+  it("every forms response is private and never stored, errors included (Cap B1-R1)", async () => {
+    const check = (res: Response) => {
+      const cc = res.headers.get("cache-control") ?? "";
+      expect(cc).toContain("no-store");
+      expect(cc).toContain("private");
+      expect(cc).not.toContain("public");
+      expect(res.headers.get("vary") ?? "").toMatch(/Authorization/i);
+    };
+    for (const gate of ["false", "true"]) {
+      vi.stubEnv("BILLING_GATE_ENABLED", gate);
+      for (const post of ["new-york", "chicago", null]) {
+        const d = await getForm("national-visa", undefined, post);
+        expect(d.status).toBe(200);
+        check(d);
+        const l = await LIST(req(post ? `/api/forms?consulate=${post}` : "/api/forms"));
+        expect(l.status).toBe(200);
+        check(l);
+      }
+    }
+    // Errors: 401, 400, 404 unknown form, 503 source unavailable, 500 sources failure, 404 flag off.
+    verifyAccessToken.mockResolvedValueOnce({ ok: false, reason: "missing" });
+    const unauth = await getForm("national-visa", "");
+    expect(unauth.status).toBe(401);
+    check(unauth);
+    const bad = await getForm("national-visa", undefined, "rome");
+    expect(bad.status).toBe(400);
+    check(bad);
+    const unknown = await getForm("permesso-kit");
+    expect(unknown.status).toBe(404);
+    check(unknown);
+    db = makeDb(seed({ source: null }));
+    const gone = await getForm();
+    expect(gone.status).toBe(503);
+    check(gone);
+    db = makeDb(seed(), ["sources"]);
+    const fail = await LIST(req("/api/forms"));
+    expect(fail.status).toBe(500);
+    check(fail);
+    vi.stubEnv("FORMS_ENABLED", "");
+    const off = await getForm();
+    expect(off.status).toBe(404);
+    check(off);
+  });
 
   it("accepts no input and returns no personal data fields", async () => {
     const text = await (await getForm()).text();

@@ -97,7 +97,12 @@ export async function handleFormsList(request: Request): Promise<NextResponse> {
     }
     const entitlement = await loadFormEntitlement(g.service, g.userId, g.logger);
     const forms = buildFormList(rows.rows, consulate.postId, entitlement);
-    g.logger.info("forms list ok", { userId: g.userId, count: forms.length, available: forms.filter((f) => f.available).length });
+    g.logger.info("forms list ok", {
+      userId: g.userId,
+      count: forms.length,
+      available: forms.filter((f) => f.available).length,
+      access: forms[0]?.access ?? null,
+    });
     return withRequestId({ forms, disclaimer: FORMS_DISCLAIMER, requestId: g.requestId }, 200, g.requestId);
   } catch (err) {
     g.logger.error("forms list threw", { code: ERROR_CODES.INTERNAL_ERROR, errorName: errorName(err) });

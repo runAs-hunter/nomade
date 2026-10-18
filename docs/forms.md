@@ -29,8 +29,11 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 
 ## Rev 6 changes (since rev 5; Visa Ops citation rewording, 18 Oct 2026)
 - **`contentVersion`** is now `"visa-ops-national-visa-2026-10-18-3"` (was `"visa-ops-national-visa-2026-10-18-2"`). Re-fetch any cached copy whose version differs.
-- **Wording only (1 served string):** `references["NY-DNV"].label` "NY Digital Nomad / Remote Worker visa page (active row `us-new-york-dnv`)" → "Consulate General of Italy in New York: Digital Nomad / Remote Worker visa page".
+- **Wording only (1 walkthrough string):** `references["NY-DNV"].label` "NY Digital Nomad / Remote Worker visa page (active row `us-new-york-dnv`)" → "Consulate General of Italy in New York: Digital Nomad / Remote Worker visa page".
 - **Generator guard:** generation fails if any served display text contains `Cap`, `Decided`, `Flagged`, `Note for Studio`, `ny-packet`, `for Visa Ops`, `active row`, a backticked id, `visa-form-source.csv` or `submit-application`. The walkthrough's "Step: `submit-application`" header line and its "(see `visa-form-source.csv`)" Sources note are not served (never were). The structured `stepId: "submit-application"` field is unchanged.
+- **Locked intro (Cap B1-N2):** the paid view's `intro.text` is now the Cap-approved "This page links the official form. Pro adds a field-by-field walkthrough and English translation." (`FORMS_LOCKED_INTRO_TEXT`, in the generator template), not the free "This walkthrough says…" text. `intro.title` is unchanged.
+- **Caching (Cap B1-R1):** every forms and journey response, errors included, carries `Cache-Control: private, no-store` and `Vary: Authorization` (set in `withRequestId` and `jsonError`). Clients must not cache them.
+- **Logs:** `forms list ok` also logs `access`.
 - No keys, ids, markers, prefill rules, anchors, `copy` or access rules changed.
 
 ## Rev 5 changes (since rev 4; B1, Isaias via Cap, 18 Oct 2026)
@@ -212,6 +215,7 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
 - **Field 29:** draw `copy.arrivalReminder` with `<month>` replaced by the target month.
 - **Free content (rev 5, B1):** the official document card, citations, the "What this is (and isn't)" intro, the disclaimer and the non-NY label/own-consulate link. The walkthrough, translation, stamps explainer and pre-filled PDF are Pro.
 - **`access`** is `"paid"` exactly when `entitlement.gateEnabled && !entitlement.journeyFull`. Paid → the server sends the slim locked view (see Rev 5); show the free parts and one upsell that opens the paywall. `entitlement.unavailable` → don't open the paywall.
+- **Refetch after a purchase or restore (Cap B1-N1):** when the entitlement changes (iOS `entitlementEpoch`), refetch the list and any open detail; a paid response never upgrades itself. Don't cache responses (they are `no-store`).
 - **Stale form:** when `prefill.reason == "needs_review"`, hide the pre-fill button and show `prefill.staleNotice`, which is "This form may have changed — check the official link". `staleNotice` is null otherwise.
 - **Which fields to fill:** only fields where `prefill == "accountName"`, that is, fields 1 and 3. Copy the name exactly as the user entered it on the device: `familyName` → field 1, `givenName` → field 3. If the user gave no name, leave the field empty.
 - **Field 29:** `reminder: "arrivalMonth"` with `anchor { page: 2, x: 3, top: 266, width: 44 }`. Draw a margin note with the F11a target month (`checklist.intake` `arrivalMonth`), outside the form frame, which starts at x = 51. **Never write into field 29.**

@@ -66,6 +66,9 @@ export const FORMS_ARRIVAL_MONTH_PLACEHOLDER = "<month>";
 export const FORMS_NAME_CHECK_NOTE =
   "Check the names in fields 1 and 3 against your passport: the form asks for them as listed in your travel document (note x).";
 
+/** Cap-approved 18 Oct (B1-N2): intro text on the paid (locked) view, which has no walkthrough. */
+export const FORMS_LOCKED_INTRO_TEXT = "This page links the official form. Pro adds a field-by-field walkthrough and English translation.";
+
 // ---------------------------------------------------------------------------
 // Verbatim Visa Ops walkthrough content (generated) below.
 // ---------------------------------------------------------------------------

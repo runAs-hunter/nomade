@@ -12,6 +12,7 @@ import {
   NATIONAL_VISA_VARIANT_POST_ID,
   FORMS_CONTENT_VERSION,
   FORMS_LOCK_SENTENCE,
+  FORMS_LOCKED_INTRO_TEXT,
   FORMS_STALE_NOTICE,
   FORMS_TRANSLATION_LABEL,
   NATIONAL_VISA_FIELDS,
@@ -161,6 +162,7 @@ describe("F12a national visa form content", () => {
     FORMS_NY_VARIANT_LABEL,
     FORMS_ARRIVAL_REMINDER,
     FORMS_NAME_CHECK_NOTE,
+    FORMS_LOCKED_INTRO_TEXT,
   ];
   const BANNED = /\bCap\b|Decided|Flagged|Note for Studio|ny-packet|for Visa Ops|active row|`[^`]*`|visa-form-source\.csv|submit-application/;
 
@@ -269,7 +271,12 @@ describe("F12a national visa form content", () => {
       "Check the names in fields 1 and 3 against your passport: the form asks for them as listed in your travel document (note x).",
     );
     expect(NATIONAL_VISA_VARIANT_POST_ID).toBe("new-york");
-    for (const c of [FORMS_NY_VARIANT_LABEL, FORMS_ARRIVAL_REMINDER, FORMS_NAME_CHECK_NOTE]) {
+    expect(FORMS_LOCKED_INTRO_TEXT).toBe(
+      "This page links the official form. Pro adds a field-by-field walkthrough and English translation.",
+    );
+    const gen = readFileSync(path.join(ROOT, "scripts/gen-forms-content.py"), "utf8");
+    expect(gen).toContain(FORMS_LOCKED_INTRO_TEXT); // survives regeneration
+    for (const c of [FORMS_NY_VARIANT_LABEL, FORMS_ARRIVAL_REMINDER, FORMS_NAME_CHECK_NOTE, FORMS_LOCKED_INTRO_TEXT]) {
       expect(ALL_TEXT).not.toContain(c);
     }
     const src = readFileSync(path.join(ROOT, "src/lib/forms/national-visa.ts"), "utf8");
@@ -278,6 +285,8 @@ describe("F12a national visa form content", () => {
     expect(cap).toBeGreaterThan(0);
     expect(src.indexOf("FORMS_NAME_CHECK_NOTE =")).toBeGreaterThan(cap);
     expect(src.indexOf("FORMS_NAME_CHECK_NOTE =")).toBeLessThan(verbatim);
+    expect(src.indexOf("FORMS_LOCKED_INTRO_TEXT =")).toBeGreaterThan(cap);
+    expect(src.indexOf("FORMS_LOCKED_INTRO_TEXT =")).toBeLessThan(verbatim);
     expect(src.indexOf("NATIONAL_VISA_FIELDS: FormField[] =")).toBeGreaterThan(verbatim);
   });
 

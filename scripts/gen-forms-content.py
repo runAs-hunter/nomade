@@ -44,6 +44,8 @@ def public_reason(r):
 # text reaches served display copy (Cap, 18 Oct): workflow terms, "active row",
 # any backticked id, the source CSV name, or the step id. The API's structured
 # `stepId` field is not display text and is not built from the markdown.
+# Cap-approved 18 Oct (B1-N2): locked-view intro. Copy, not walkthrough content; it passes the guard.
+LOCKED_INTRO = "This page links the official form. Pro adds a field-by-field walkthrough and English translation."
 INTERNAL_TEXT = re.compile(
     r'\bCap\b|Decided|Flagged|Note for Studio|ny-packet|for Visa Ops'
     r'|active row|`[^`]*`|visa-form-source\.csv|submit-application'
@@ -112,7 +114,7 @@ served_display = (
     [f[k] for f in out for k in DISPLAY_KEYS]
     + list(_served_strings([[s["text"], s.get("items", [])] for s in sections]))
     + list(_served_strings([stamps, intro, REF_LABELS]))
-    + [LOCK, TL]
+    + [LOCK, TL, LOCKED_INTRO]
 )
 leaks = [s_ for s_ in served_display if INTERNAL_TEXT.search(s_)]
 if leaks:
@@ -184,6 +186,9 @@ export const FORMS_ARRIVAL_MONTH_PLACEHOLDER = "<month>";
  */
 export const FORMS_NAME_CHECK_NOTE =
   "Check the names in fields 1 and 3 against your passport: the form asks for them as listed in your travel document (note x).";
+
+/** Cap-approved 18 Oct (B1-N2): intro text on the paid (locked) view, which has no walkthrough. */
+export const FORMS_LOCKED_INTRO_TEXT = {json.dumps(LOCKED_INTRO, ensure_ascii=False)};
 
 // ---------------------------------------------------------------------------
 // Verbatim Visa Ops walkthrough content (generated) below.
