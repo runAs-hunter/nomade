@@ -3,6 +3,11 @@ import { readFileSync, readdirSync } from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
 import {
+  FORMS_ARRIVAL_MONTH_PLACEHOLDER,
+  FORMS_ARRIVAL_REMINDER,
+  FORMS_NAME_CHECK_NOTE,
+  FORMS_NY_VARIANT_LABEL,
+  NATIONAL_VISA_VARIANT_POST_ID,
   FORMS_CONTENT_VERSION,
   FORMS_LOCK_SENTENCE,
   FORMS_STALE_NOTICE,
@@ -148,5 +153,33 @@ describe("F12a national visa form content", () => {
     expect(FORMS.map((f) => [f.formId, f.sourceId, f.contentVersion])).toEqual([
       ["national-visa", NATIONAL_VISA_SOURCE_ID, FORMS_CONTENT_VERSION],
     ]);
+  });
+
+  it("Cap-approved copy (18 Oct) is byte-exact and kept out of the walkthrough content", () => {
+    expect(FORMS_NY_VARIANT_LABEL).toBe("Based on the New York version of the form");
+    expect(FORMS_ARRIVAL_REMINDER).toBe("Your target arrival: <month>. Enter the exact date.");
+    expect(FORMS_ARRIVAL_REMINDER).toContain(FORMS_ARRIVAL_MONTH_PLACEHOLDER);
+    expect(FORMS_NAME_CHECK_NOTE).toBe(
+      "Check the names in fields 1 and 3 against your passport: the form asks for them as listed in your travel document (note x).",
+    );
+    expect(NATIONAL_VISA_VARIANT_POST_ID).toBe("new-york");
+    for (const c of [FORMS_NY_VARIANT_LABEL, FORMS_ARRIVAL_REMINDER, FORMS_NAME_CHECK_NOTE]) {
+      expect(ALL_TEXT).not.toContain(c);
+    }
+    const src = readFileSync(path.join(ROOT, "src/lib/forms/national-visa.ts"), "utf8");
+    const cap = src.indexOf("// Cap-approved copy, 18 Oct 2026.");
+    const verbatim = src.indexOf("// Verbatim Visa Ops walkthrough content (generated) below.");
+    expect(cap).toBeGreaterThan(0);
+    expect(src.indexOf("FORMS_NAME_CHECK_NOTE =")).toBeGreaterThan(cap);
+    expect(src.indexOf("FORMS_NAME_CHECK_NOTE =")).toBeLessThan(verbatim);
+    expect(src.indexOf("NATIONAL_VISA_FIELDS: FormField[] =")).toBeGreaterThan(verbatim);
+  });
+
+  it("vercel.json schedules check-sources monthly (CRON_SECRET route)", () => {
+    const vercel = JSON.parse(readFileSync(path.join(ROOT, "vercel.json"), "utf8")) as {
+      crons: { path: string; schedule: string }[];
+    };
+    expect(vercel.crons).toContainEqual({ path: "/api/cron/check-sources", schedule: "0 5 1 * *" });
+    expect(vercel.crons).toContainEqual({ path: "/api/cron/purge-accounts", schedule: "0 4 * * *" });
   });
 });

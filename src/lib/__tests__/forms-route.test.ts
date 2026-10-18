@@ -13,7 +13,13 @@ vi.mock("@/lib/supabase/server", () => ({ createServiceClient: () => db }));
 
 import { GET as LIST } from "@/app/api/forms/route";
 import { GET as GET_FORM } from "@/app/api/forms/[formId]/route";
-import { FORMS_STALE_NOTICE, NATIONAL_VISA_FIELDS, NATIONAL_VISA_TEMPLATE } from "@/lib/forms/national-visa";
+import {
+  FORMS_NAME_CHECK_NOTE,
+  FORMS_STALE_NOTICE,
+  NATIONAL_VISA_FIELDS,
+  NATIONAL_VISA_TEMPLATE,
+} from "@/lib/forms/national-visa";
+import { US_CONSULATE_POSTS } from "@/lib/journey/consulates";
 
 type Row = Record<string, unknown>;
 
@@ -66,7 +72,9 @@ function seed(over: { source?: Row | null; entitlement?: string | null; deletion
 const req = (p: string, auth = "Bearer good") =>
   new Request(`https://api.example.test${p}`, { headers: auth ? { authorization: auth } : {} });
 const ctx = (formId: string) => ({ params: Promise.resolve({ formId }) });
-const getForm = (formId = "national-visa", auth?: string) => GET_FORM(req(`/api/forms/${formId}`, auth), ctx(formId));
+const getForm = (formId = "national-visa", auth?: string, consulate: string | null = "new-york") =>
+  GET_FORM(req(`/api/forms/${formId}${consulate === null ? "" : `?consulate=${consulate}`}`, auth), ctx(formId));
+const NY_PDF = "https://consnewyork.esteri.it/wp-content/uploads/2023/06/formulario_nazionale_visti2.pdf";
 
 beforeEach(() => {
   vi.stubEnv("FORMS_ENABLED", "true");
@@ -100,7 +108,7 @@ describe("GET /api/forms* (F12a)", () => {
   });
 
   it("list: one form, available, keyed to the source row", async () => {
-    const res = await LIST(req("/api/forms"));
+    const res = await LIST(req("/api/forms?consulate=new-york"));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.disclaimer).toBe("Preliminary guidance — not legal advice");
@@ -114,6 +122,8 @@ describe("GET /api/forms* (F12a)", () => {
         contentVersion: "visa-ops-national-visa-2026-10-18",
         available: true,
         needsReview: false,
+        variant: { postId: "new-york", matchesConsulate: true, label: null },
+        pdfAvailable: true,
       },
     ]);
   });
@@ -147,7 +157,19 @@ describe("GET /api/forms* (F12a)", () => {
     });
     expect(b.fields).toHaveLength(37);
     expect(b.fields).toEqual(JSON.parse(JSON.stringify(NATIONAL_VISA_FIELDS)));
-    expect(b.prefill).toEqual({ available: true, staleNotice: null });
+    expect(b.prefill).toEqual({ available: true, reason: null, staleNotice: null });
+    expect(b.variant).toEqual({ postId: "new-york", matchesConsulate: true, label: null });
+    expect(b.consulate).toEqual({
+      postId: "new-york",
+      officialUrl: "https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/",
+      host: "consnewyork.esteri.it",
+    });
+    expect(b.copy).toEqual({
+      nameCheck: FORMS_NAME_CHECK_NOTE,
+      arrivalReminder: "Your target arrival: <month>. Enter the exact date.",
+      arrivalMonthPlaceholder: "<month>",
+    });
+    expect(b.references["F-NY"].url).toBe(NY_PDF);
     expect(b.access).toBe("free");
     expect(b.entitlement).toEqual({ journeyFull: false, gateEnabled: false });
   });
@@ -182,9 +204,9 @@ describe("GET /api/forms* (F12a)", () => {
     db = makeDb(seed({ source: sourceRow({ needs_review: true }) }));
     const b = await (await getForm()).json();
     expect(b.source.needsReview).toBe(true);
-    expect(b.prefill).toEqual({ available: false, staleNotice: FORMS_STALE_NOTICE });
+    expect(b.prefill).toEqual({ available: false, reason: "needs_review", staleNotice: FORMS_STALE_NOTICE });
     expect(b.prefill.staleNotice).toBe("This form may have changed — check the official link");
-    const list = await (await LIST(req("/api/forms"))).json();
+    const list = await (await LIST(req("/api/forms?consulate=new-york"))).json();
     expect(list.forms[0].needsReview).toBe(true);
   });
 
@@ -208,5 +230,75 @@ describe("GET /api/forms* (F12a)", () => {
   it("accepts no input and returns no personal data fields", async () => {
     const text = await (await getForm()).text();
     expect(text).not.toMatch(/"(passport|birthDate|address|name|givenName|familyName)"\s*:/);
+  });
+
+  describe("consulate variants (Cap, 18 Oct)", () => {
+    const others = US_CONSULATE_POSTS.filter((p) => p.id !== "new-york");
+
+    it.each(others.map((p) => [p.id, p.instructionUrl]))(
+      "%s: walkthrough labelled NY version, own consulate link, no NY PDF anywhere",
+      async (postId, url) => {
+        vi.stubEnv("BILLING_GATE_ENABLED", "true");
+        db = makeDb(seed({ entitlement: "active" }));
+        const res = await getForm("national-visa", undefined, postId);
+        expect(res.status).toBe(200);
+        const text = await res.clone().text();
+        const b = await res.json();
+        expect(b.variant).toEqual({
+          postId: "new-york",
+          matchesConsulate: false,
+          label: "Based on the New York version of the form",
+        });
+        expect(b.consulate).toEqual({ postId, officialUrl: url, host: new URL(url).hostname.replace(/^www\./, "") });
+        expect(b.template).toBeNull();
+        expect(b.source).toBeNull();
+        expect(b.prefill).toEqual({ available: false, reason: "consulate", staleNotice: null });
+        expect(b.fields).toHaveLength(37);
+        for (const f of b.fields) {
+          expect(f.prefill).toBeNull();
+          expect(f.prefillPart).toBeNull();
+          expect(f.anchor).toBeNull();
+        }
+        expect(b.fields[28].reminder).toBe("arrivalMonth");
+        expect(b.references["F-NY"].url).toBeNull();
+        // Never serve the NY-headed PDF or the template to another post.
+        expect(text).not.toContain("formulario_nazionale_visti2.pdf");
+        expect(text).not.toContain(NATIONAL_VISA_TEMPLATE.sha256);
+        expect(text).toContain(b.fields[0].asks.replace(/"/g, '\\"'));
+      },
+    );
+
+    it("no consulate param → unknown: label shown, consulate null, no PDF", async () => {
+      const b = await (await getForm("national-visa", undefined, null)).json();
+      expect(b.variant.label).toBe("Based on the New York version of the form");
+      expect(b.consulate).toBeNull();
+      expect(b.template).toBeNull();
+      expect(b.source).toBeNull();
+      expect(b.prefill.reason).toBe("consulate");
+      const list = await (await LIST(req("/api/forms"))).json();
+      expect(list.forms[0]).toMatchObject({ available: true, pdfAvailable: false, variant: { matchesConsulate: false } });
+    });
+
+    it("needs_review on a non-NY post: no stale notice (no PDF offered anyway)", async () => {
+      db = makeDb(seed({ source: sourceRow({ needs_review: true }) }));
+      const b = await (await getForm("national-visa", undefined, "boston")).json();
+      expect(b.prefill).toEqual({ available: false, reason: "consulate", staleNotice: null });
+    });
+
+    it("unknown consulate id → 400 BAD_REQUEST (list and detail)", async () => {
+      const res = await getForm("national-visa", undefined, "rome");
+      expect(res.status).toBe(400);
+      expect((await res.json()).error.code).toBe("BAD_REQUEST");
+      expect((await LIST(req("/api/forms?consulate=NEW-YORK"))).status).toBe(400);
+    });
+
+    it("list for a non-NY post: available, pdfAvailable false, labelled", async () => {
+      const list = await (await LIST(req("/api/forms?consulate=chicago"))).json();
+      expect(list.forms[0]).toMatchObject({
+        available: true,
+        pdfAvailable: false,
+        variant: { postId: "new-york", matchesConsulate: false, label: "Based on the New York version of the form" },
+      });
+    });
   });
 });

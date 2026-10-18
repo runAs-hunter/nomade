@@ -21,8 +21,9 @@ function flag(url: URL, name: string): boolean {
 
 /**
  * GET|POST /api/cron/check-sources (F8 monthly freshness stub)
- * Manual trigger only — Authorization: Bearer ${CRON_SECRET} (purge-accounts
- * pattern). Intentionally NOT scheduled in vercel.json (F8 lock).
+ * Authorization: Bearer ${CRON_SECRET} (purge-accounts pattern). F12a (Cap,
+ * 18 Oct 2026): scheduled monthly in vercel.json (`0 5 1 * *` UTC, Production
+ * only); still callable by hand.
  * Query: ?dryRun=1 (probe only, no writes), ?hash=1 (GET + sha256 body).
  * F12a: pinned form PDFs are always hashed; a mismatch sets needs_review.
  */

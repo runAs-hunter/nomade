@@ -14,6 +14,7 @@ import {
   FORMS_DISCLAIMER,
   loadFormEntitlement,
   loadFormSources,
+  parseConsulateParam,
 } from "@/lib/forms/view";
 import { requireActiveJourneyAccount } from "@/lib/journey/access";
 import { activeAccountErrorResponse, withRequestId } from "@/lib/journey/http";
@@ -45,6 +46,15 @@ async function gate(request: Request, failMessage: string): Promise<Gate> {
   return { ok: true, userId: auth.userId, service, logger, requestId };
 }
 
+function badConsulate(requestId: string): NextResponse {
+  return jsonError({
+    code: ERROR_CODES.BAD_REQUEST,
+    message: "consulate must be a known US consular post id",
+    requestId,
+    status: 400,
+  });
+}
+
 function internal(requestId: string, message: string): NextResponse {
   return jsonError({ code: ERROR_CODES.INTERNAL_ERROR, message, requestId, status: 500 });
 }
@@ -55,12 +65,14 @@ export async function handleFormsList(request: Request): Promise<NextResponse> {
   if (!g) return internal(getRequestId(request), "Unexpected forms failure");
   if (!g.ok) return g.response;
   try {
+    const consulate = parseConsulateParam(new URL(request.url));
+    if (!consulate.ok) return badConsulate(g.requestId);
     const rows = await loadFormSources(g.service, FORMS.map((f) => f.sourceId));
     if (!rows.ok) {
       g.logger.error("forms list sources failed", { code: ERROR_CODES.INTERNAL_ERROR });
       return internal(g.requestId, "Failed to load forms");
     }
-    const forms = buildFormList(rows.rows);
+    const forms = buildFormList(rows.rows, consulate.postId);
     g.logger.info("forms list ok", { userId: g.userId, count: forms.length, available: forms.filter((f) => f.available).length });
     return withRequestId({ forms, disclaimer: FORMS_DISCLAIMER, requestId: g.requestId }, 200, g.requestId);
   } catch {
@@ -79,6 +91,8 @@ export async function handleFormGet(request: Request, formId: string): Promise<N
     if (!def) {
       return jsonError({ code: ERROR_CODES.NOT_FOUND, message: "Unknown form", requestId: g.requestId, status: 404 });
     }
+    const consulate = parseConsulateParam(new URL(request.url));
+    if (!consulate.ok) return badConsulate(g.requestId);
     const rows = await loadFormSources(g.service, [def.sourceId]);
     if (!rows.ok) {
       g.logger.error("form source read failed", { code: ERROR_CODES.INTERNAL_ERROR, formId: def.formId });
@@ -95,12 +109,20 @@ export async function handleFormGet(request: Request, formId: string): Promise<N
       });
     }
     const entitlement = await loadFormEntitlement(g.service, g.userId);
-    const view = buildFormView({ def, row, entitlement, origin: new URL(request.url).origin });
+    const view = buildFormView({
+      def,
+      row,
+      entitlement,
+      origin: new URL(request.url).origin,
+      consulatePostId: consulate.postId,
+    });
     g.logger.info("form get ok", {
       userId: g.userId,
       formId: def.formId,
       contentVersion: def.contentVersion,
-      needsReview: view.source.needsReview,
+      consulatePostId: consulate.postId,
+      template: view.template !== null,
+      needsReview: row.needs_review === true,
       access: view.access,
     });
     return withRequestId({ ...view, requestId: g.requestId }, 200, g.requestId);

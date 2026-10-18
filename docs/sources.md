@@ -81,7 +81,7 @@ Errors: `{ error: { code, message, requestId } }` + `x-request-id`.
 
 ## Monthly refresh — `GET|POST /api/cron/check-sources`
 
-Manual trigger only (purge-accounts pattern): `Authorization: Bearer ${CRON_SECRET}`. **No `vercel.json` cron entry** (Vercel crons fire on Production only — wiring waits for an explicit Isaias ask).
+`Authorization: Bearer ${CRON_SECRET}` (purge-accounts pattern). **F12a (Cap, 18 Oct 2026):** `vercel.json` schedules it monthly, `0 5 1 * *` UTC (05:00 UTC on the 1st). Vercel crons fire on Production only and send the bearer automatically; Isaias approves the schedule by merging. Manual calls still work.
 
 | Query | Effect |
 |---|---|
@@ -135,7 +135,7 @@ curl -sS -X POST -H "Authorization: Bearer $CRON_SECRET" "https://<host>/api/cro
 
 ## Out of scope (F8)
 
-Chat cite UX / prompt changes (F9), RAG / embeddings, iOS UI, multi-country seed, `vercel.json` cron, nomade-prod.
+Chat cite UX / prompt changes (F9), RAG / embeddings, iOS UI, multi-country seed, nomade-prod.
 
 ## F9 — `step_ids` mapping
 

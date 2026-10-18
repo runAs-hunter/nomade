@@ -1,5 +1,5 @@
 /**
- * F8 monthly freshness check (manual-trigger stub; no vercel.json cron).
+ * F8 monthly freshness check (vercel.json cron `0 5 1 * *` UTC since F12a; also manual).
  *
  * HEAD each active official_url (GET fallback), record status, optionally hash
  * the body, and mark `stale` ONLY on hard failures:

@@ -75,8 +75,8 @@ body = f'''/**
  *
  * GENERATED from docs/forms/visa-form-walkthrough.md (Visa Ops, Cap-approved
  * prefill markers 2026-10-18) by scripts/gen-forms-content.py. Do not hand-edit
- * copy: every string is verbatim from the walkthrough (see national-visa.test.ts,
- * which re-reads the markdown). Explains what each field ASKS FOR, never what to
+ * copy: every walkthrough string is verbatim (national-visa.test.ts re-reads the
+ * markdown). The only other copy is the marked "Cap-approved 18 Oct" block. Explains what each field ASKS FOR, never what to
  * put. Not legal advice. Form values never reach the server (decision 2).
  */
 
@@ -114,6 +114,33 @@ export const FORMS_LOCK_SENTENCE = {json.dumps(LOCK, ensure_ascii=False)};
 
 /** Runbook decision 6: shown when the source row needs review; prefill hidden. */
 export const FORMS_STALE_NOTICE = "This form may have changed — check the official link";
+
+// ---------------------------------------------------------------------------
+// Cap-approved copy, 18 Oct 2026. NOT from the Visa Ops walkthrough; kept out
+// of the verbatim walkthrough content below.
+// ---------------------------------------------------------------------------
+
+/** The form variant this content and template describe (consulate post id). */
+export const NATIONAL_VISA_VARIANT_POST_ID = "new-york";
+
+/** Cap-approved 18 Oct: label on the walkthrough for every non-New York consulate. */
+export const FORMS_NY_VARIANT_LABEL = "Based on the New York version of the form";
+
+/** Cap-approved 18 Oct: field 29 margin reminder. iOS replaces `<month>` with the F11a target month. */
+export const FORMS_ARRIVAL_REMINDER = "Your target arrival: <month>. Enter the exact date.";
+export const FORMS_ARRIVAL_MONTH_PLACEHOLDER = "<month>";
+
+/**
+ * Cap-approved 18 Oct: name check for fields 1 and 3. Verbatim from the 0.3
+ * Jane Sample (/workspace/F12-phase0/build/build_jane_sample.py `NAMES_NOTE`,
+ * printed in the footer of out/0.3-jane-sample-national-visa-form-SAMPLE.pdf).
+ */
+export const FORMS_NAME_CHECK_NOTE =
+  "Check the names in fields 1 and 3 against your passport: the form asks for them as listed in your travel document (note x).";
+
+// ---------------------------------------------------------------------------
+// Verbatim Visa Ops walkthrough content (generated) below.
+// ---------------------------------------------------------------------------
 
 export type FormRef = "F-NY" | "F-C" | "NY-DNV";
 export type PrefillKind = "accountName" | "arrivalMonth" | "consulate";
