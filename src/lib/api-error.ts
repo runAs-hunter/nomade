@@ -56,6 +56,17 @@ export type JsonErrorArgs = {
 };
 
 /** Build a NextResponse with the locked error envelope + x-request-id. */
+/**
+ * Cap B1-R1: API JSON is per-user (Bearer) and can carry paid content, so no
+ * cache may store it: not a shared cache (Vercel's default is `public,
+ * max-age=0, must-revalidate`) and not the phone's on-disk URLCache. Set on every
+ * withRequestId / jsonError response, errors included.
+ */
+export function setNoStoreHeaders(res: Response): void {
+  res.headers.set("Cache-Control", "private, no-store");
+  res.headers.set("Vary", "Authorization");
+}
+
 export function jsonError({
   code,
   message,
@@ -67,5 +78,6 @@ export function jsonError({
   };
   const res = NextResponse.json(body, { status });
   res.headers.set(REQUEST_ID_HEADER, requestId);
+  setNoStoreHeaders(res);
   return res;
 }

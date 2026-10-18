@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { ERROR_CODES, jsonError } from "@/lib/api-error";
+import { ERROR_CODES, jsonError, setNoStoreHeaders } from "@/lib/api-error";
 import { REQUEST_ID_HEADER } from "@/lib/request-id";
 import type { RequireActiveJourneyAccountResult } from "@/lib/journey/access";
 
@@ -14,6 +14,8 @@ export function withRequestId<T>(
 ): NextResponse<T> {
   const res = NextResponse.json(body, { status });
   res.headers.set(REQUEST_ID_HEADER, requestId);
+  // Cap B1-R1: every forms / journey response (and every other caller) is private, never stored.
+  setNoStoreHeaders(res);
   return res;
 }
 
