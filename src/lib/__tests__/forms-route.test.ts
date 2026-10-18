@@ -131,7 +131,7 @@ describe("GET /api/forms* (F12a)", () => {
         stepId: "submit-application",
         sourceId: "us-new-york-national-visa-form",
         scope: "US-consulate:new-york",
-        contentVersion: "visa-ops-national-visa-2026-10-18",
+        contentVersion: "visa-ops-national-visa-2026-10-18-2",
         available: true,
         needsReview: false,
         variant: { postId: "new-york", templateScope: "US-consulate:new-york", prefillPosts: ["new-york"], matchesConsulate: true, label: null },
@@ -161,6 +161,19 @@ describe("GET /api/forms* (F12a)", () => {
     expect(unset.template.url).toBeNull();
     expect(unset.template.path).toBe("/forms/formulario_nazionale_visti2.pdf");
   });
+
+  it.each(["new-york", "chicago", null])(
+    "no internal workflow text is served (consulate %s): no Cap/Decided/Flagged, no uncertainty list, no ny-packet bullet",
+    async (postId) => {
+      const detail = await (await getForm("national-visa", undefined, postId)).text();
+      const list = await (await LIST(req(postId ? `/api/forms?consulate=${postId}` : "/api/forms"))).text();
+      for (const text of [detail, list]) {
+        expect(text).not.toMatch(/\bCap\b|Decided|Flagged|Note for Studio|for Visa Ops|ny-packet/);
+        expect(text).not.toContain("Signing both page-3 and page-4 lines");
+        expect(text).not.toContain("Which form is \\\"current\\\"");
+      }
+    },
+  );
 
   it("variant scope: only prefillPosts get the PDF (Cap review item 1)", async () => {
     const list = await (await LIST(req("/api/forms?consulate=new-york"))).json();

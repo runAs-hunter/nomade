@@ -2,7 +2,7 @@
 
 `Preliminary guidance — not legal advice`
 
-Status: DRAFT for Visa Ops review. Read 2026-10-18 (Europe/Rome). Step: `submit-application`.
+Status: Signed off by Visa Ops 2026-10-18. Read 2026-10-18 (Europe/Rome). Step: `submit-application`.
 
 ## What this is (and isn't)
 This walkthrough says what each field on the form **asks for**. It does not say what to put in any field. Nomade does not choose a visa type box, a purpose of stay, or anything about eligibility for you.
@@ -13,7 +13,7 @@ Lock sentence, used on every ambiguous field:
 ## Sources (the form itself; every claim below cites one of these)
 | Cite | Document | URL | sha256 (downloaded 2026-10-18) |
 |---|---|---|---|
-| [F-NY] | "Domanda di visto Nazionale (D)" with the "Consolato Generale d'Italia New York" header. Bilingual IT/EN, 4 pages. Linked today from the NY "Visas forms" page as "Long term Visa Application Form" | https://consnewyork.esteri.it/wp-content/uploads/2023/06/formulario_nazionale_visti2.pdf | d0631552d1e474c522911cc74d18c15fe474984ad79bd65ce3f5a880ee13ed20 |
+| [F-NY] | "Domanda di visto Nazionale (D)" with the "Consolato Generale d'Italia New York" header. Bilingual IT/EN, 4 pages. Linked on 2026-10-18 from the NY "Visas forms" page as "Long term Visa Application Form" | https://consnewyork.esteri.it/wp-content/uploads/2023/06/formulario_nazionale_visti2.pdf | d0631552d1e474c522911cc74d18c15fe474984ad79bd65ce3f5a880ee13ed20 |
 | [F-C] | "Domanda di visto Nazionale (D) — Modulo gratuito", central MAECI copy. Italian only, 4 pages | https://vistoperitalia.esteri.it/files/public/moduli/it/Formulario_Visto_Nazionale.pdf | d1d61879b3df549fad0ea0c756a2357c28b3e88d91149a0e82dfb6535f27a880 |
 | [NY-DNV] | NY Digital Nomad / Remote Worker visa page (active row `us-new-york-dnv`) | https://consnewyork.esteri.it/en/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/visas-to-enter-italy/digital-nomad-remote-worker-visa/ | page read 2026-10-18 |
 
@@ -110,7 +110,7 @@ The Italian text on the form is the original, and it is the version that gets su
 
 ## Fees and stamps printed on the form
 - [F-C] prints "Modulo gratuito" (the form itself is free). [F-C]
-- **Marca da bollo / revenue stamp:** no cited source requires one for US applicants. Neither form mentions one, nor do the NY pages read today or any active Nomade source row (all were searched for "bollo", "marca" and "revenue stamp" on 2026-10-18).
+- **Marca da bollo / revenue stamp:** no cited source requires one for US applicants. Neither form mentions one, nor do the NY pages read on 2026-10-18 or any active Nomade source row (all were searched for "bollo", "marca" and "revenue stamp" on 2026-10-18).
 - The visa fee is a separate matter, covered in `ny-packet.md`.
 
 ## Prefill markers (per field)
@@ -124,7 +124,7 @@ Markers:
 
 How the three Phase 1 items map onto the form:
 - **Name.** Surname and given names are separate fields: field 1 "Cognome" and field 3 "Nome/i". [F-NY][F-C] Both carry note (x): "come indicate nel documento di viaggio" ("according to the information listed in the travel document"). [F-NY] So Phase 1 may only copy a name into 1 and 3 exactly as the user entered it. The user still has to check it against their travel document. Field 2, "Cognome alla nascita (cognome/i precedente/i)", is a separate field and is **not** part of Phase 1 "name".
-- **Arrival month.** The only arrival field is 29, "Data di arrivo prevista nell'area Schengen". It asks for a date, not a month. [F-NY] Arrival and departure are separate fields (29 and 30). A month cannot fill a date field without adding a day the user never gave. Field 29 is therefore marked `copy-only`, and Phase 1 arrival-month prefill has **no form field it can fill completely**. Flagged for Cap.
+- **Arrival month.** The only arrival field is 29, "Data di arrivo prevista nell'area Schengen". It asks for a date, not a month. [F-NY] Arrival and departure are separate fields (29 and 30). A month cannot fill a date field without adding a day the user never gave. Field 29 is therefore marked `copy-only`, and Phase 1 arrival-month prefill has **no form field it can fill completely**. The app shows the target month beside field 29 as a reminder.
 - **Consulate.** No numbered field (1–37) asks for the consulate. On [F-NY] the header already prints "Consolato Generale d'Italia … New York". On [F-C] the header prints "Ambasciata d'Italia". "Domanda presentata presso: Ambasciata/Consolato" sits in the office-use column. [F-NY][F-C] The consulate can only be shown as the choice of which post's form to use (the header). It is never written into a numbered field or into the office-use column.
 
 | Field | Label (as printed, short) | Marker | One-line reason (from the label only) |
@@ -148,8 +148,8 @@ How the three Phase 1 items map onto the form:
 | Field 17 | Indirizzo … posta elettronica … telefono | `copy-only` | Asks for the applicant's own address, e-mail and phone. |
 | Field 18 | Residenza in un paese diverso dal paese di cittadinanza attuale | `copy-only` | Asks yes/no about residence outside the country of nationality, plus permit details. It is not name, arrival month or consulate, so no Phase 1 prefill. |
 | Field 19 | Occupazione attuale | `copy-only` | Asks for the current occupation. It is not name, arrival month or consulate, so no Phase 1 prefill. |
-| Field 20 | Datore di lavoro … / istituto di insegnamento | `never-prefill` | Carries the lock sentence (Cap 2026-10-18). |
-| Field 21 | Scopo del viaggio | `never-prefill` | The purpose-of-journey box is a legal choice. Never prefilled (Cap 2026-10-18). |
+| Field 20 | Datore di lavoro … / istituto di insegnamento | `never-prefill` | Carries the lock sentence. |
+| Field 21 | Scopo del viaggio | `never-prefill` | The purpose-of-journey box is a legal choice. Never prefilled. |
 | Field 22 | Città di destinazione | `copy-only` | Asks for the destination city. It is not name, arrival month or consulate, so no Phase 1 prefill. |
 | Field 23 | Eventuale Stato membro di primo ingresso | `copy-only` | Asks for the Schengen state of first entry, if applicable. |
 | Field 24 | Numero di ingressi richiesti | `never-prefill` | Carries the lock sentence. |
@@ -157,11 +157,11 @@ How the three Phase 1 items map onto the form:
 | Field 26 | Visti Schengen rilasciati negli ultimi tre anni | `copy-only` | Asks about Schengen visas from the past three years and their dates. It is not name, arrival month or consulate, so no Phase 1 prefill. |
 | Field 27 | Impronte digitali rilevate in precedenza … | `copy-only` | Asks whether fingerprints were taken before, and the date if known. It is not name, arrival month or consulate, so no Phase 1 prefill. |
 | Field 28 | Numero del Nullaosta … | `never-prefill` | Carries the lock sentence ("solo ove richiesto dalla normativa"). |
-| Field 29 | Data di arrivo prevista nell'area Schengen | `copy-only` | Asks for a full arrival date. Phase 1 holds only a month, so it cannot prefill this field without adding a day. Flagged for Cap. |
+| Field 29 | Data di arrivo prevista nell'area Schengen | `copy-only` | Asks for a full arrival date. Phase 1 holds only a month, so it cannot prefill this field without adding a day. The app shows the target month beside it as a reminder. |
 | Field 30 | Data di partenza prevista … (solo … 91 ed i 364gg.) | `never-prefill` | Carries the lock sentence (conditional on visa length). |
-| Field 31 | Persona che ha richiesto il ricongiungimento o datore di lavoro … | `never-prefill` | Carries the lock sentence (Cap 2026-10-18). |
+| Field 31 | Persona che ha richiesto il ricongiungimento o datore di lavoro … | `never-prefill` | Carries the lock sentence. |
 | Field 32 | Impresa/organizzazione che invita | `never-prefill` | Carries the lock sentence. |
-| Field 33 | Spese di viaggio e di soggiorno … a carico | `never-prefill` | Carries the lock sentence (Cap 2026-10-18). |
+| Field 33 | Spese di viaggio e di soggiorno … a carico | `never-prefill` | Carries the lock sentence. |
 | Field 34 | Dati anagrafici del familiare cittadino UE, SEE o CH | `never-prefill` | Carries the lock sentence. |
 | Field 35 | Vincolo familiare con un cittadino UE, SEE o CH | `never-prefill` | Carries the lock sentence (tick box for a family relationship). |
 | Field 36 | Luogo e data | `never-prefill` | The place and date that go with the applicant's signature (field 37). |
@@ -171,7 +171,7 @@ How the three Phase 1 items map onto the form:
 Note for Studio (not for the public page): resolved 2026-10-18. Per Cap, the 0.3 sample prefills only fields 1 (Cognome) and 3 (Nome/i). Field 29 is not prefilled; the app shows the target month beside it as a reminder. There is no consulate prefill; the consulate selects the form version and packet.
 
 ## Uncertain / for Visa Ops
-1. Which form is "current": neither form prints a version date. [F-NY] is what NY links today. See `visa-form-source.csv`.
+1. Which form is "current": neither form prints a version date. [F-NY] is what NY linked on 2026-10-18. See `visa-form-source.csv`.
 2. Field 21 has no digital nomad or remote worker option. Which box applies, if any, is not stated on the form or on [NY-DNV]. Decided (Cap 2026-10-18): field 21 is never prefilled.
 3. Fields 20, 31, 33 (decided, Cap 2026-10-18: they keep the lock sentence and are never prefilled): the form's own notes refer to "Lavoro Subordinato/Autonomo" and an employer "in Italy". How they apply to DNV/RW is not stated by any source read.
 4. Signing both page-3 and page-4 lines: not stated.

@@ -28,8 +28,13 @@ for line in md:
 INTERNAL_NOTES = [" Flagged for Cap.", " (Cap 2026-10-18)"]
 def public_reason(r):
     for n in INTERNAL_NOTES: r = r.replace(n, "")
-    assert "Cap" not in r, r
+    assert not INTERNAL_TEXT.search(r), r
     return r
+# Never served: "Note for Studio", "## Uncertain / for Visa Ops" (internal, incl. its
+# "Decided (Cap …)" lines) and the stamps bullet that points at the internal
+# `ny-packet.md`. The generator reads only the line ranges below; this guard
+# fails generation if any internal text reaches served copy.
+INTERNAL_TEXT = re.compile(r'\bCap\b|Decided|Flagged|Note for Studio|ny-packet|for Visa Ops')
 assert sorted(markers) == list(range(1, 38))
 REFS = re.compile(r'\[(F-NY|F-C|NY-DNV)\]')
 def refs(s): 
@@ -75,8 +80,17 @@ for s in sections:
     s["sourceIds"] = [SRC[x] for x in s["refs"] if SRC[x]]
 stamps = {"title": L(111)[3:], "items": [L(112)[2:], L(113)[2:]]}
 assert L(111) == "## Fees and stamps printed on the form"
+assert "ny-packet.md" in L(114) and L(115) == "", "stamps: the internal ny-packet.md bullet moved; re-check what is dropped"
 intro = {"title": L(7)[3:], "text": L(8), "labelsNote": L(22), "translationNote": L(26)}
 def ts(v): return json.dumps(v, ensure_ascii=False, indent=2)
+def _served_strings(v):
+    if isinstance(v, str): yield v
+    elif isinstance(v, dict):
+        for x in v.values(): yield from _served_strings(x)
+    elif isinstance(v, list):
+        for x in v: yield from _served_strings(x)
+for s_ in _served_strings([out, sections, stamps, intro, [md[15], md[16], md[17]]]):
+    assert not INTERNAL_TEXT.search(s_), s_
 body = f'''/**
  * F12a — national visa (type D) application form: content for GET /api/forms/national-visa.
  *
@@ -87,7 +101,8 @@ body = f'''/**
  * put. Not legal advice. Form values never reach the server (decision 2).
  */
 
-export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18";
+/** Bumped whenever the served copy changes. "-2": Visa Ops sign-off wording (18 Oct 2026). */
+export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-2";
 
 export const NATIONAL_VISA_FORM_ID = "national-visa";
 

@@ -133,6 +133,19 @@ describe("F12a national visa form content", () => {
     for (const s of ALL_TEXT) expect(s).not.toMatch(/\byou should\b|\bwe recommend\b|\bthe right (box|answer)\b|\b(tick|select|choose) (the|this) box\b/i);
   });
 
+  it("the walkthrough's internal sections are never in the served content (uncertainty list, Studio note, ny-packet bullet)", () => {
+    const start = MD.indexOf("## Uncertain / for Visa Ops");
+    expect(start).toBeGreaterThan(0);
+    const uncertain = MD.slice(start).split("\n").filter((l) => /^\d+\. /.test(l)).map((l) => l.replace(/^\d+\. /, ""));
+    expect(uncertain.length).toBeGreaterThanOrEqual(7);
+    const studio = MD.split("\n").find((l) => l.startsWith("Note for Studio"))!;
+    const packet = MD.split("\n").find((l) => l.includes("ny-packet.md"))!;
+    const served = JSON.stringify([ALL_TEXT, NATIONAL_VISA_STAMPS, NATIONAL_VISA_REFERENCES, NATIONAL_VISA_SECTIONS, NATIONAL_VISA_INTRO]);
+    for (const l of [...uncertain, studio, packet.slice(2)]) expect(served).not.toContain(JSON.stringify(l).slice(1, -1));
+    expect(served).not.toMatch(/\bCap\b|Decided|Flagged|ny-packet/);
+    expect(NATIONAL_VISA_STAMPS.items).toHaveLength(2);
+  });
+
   it("only the account name is ever prefilled (PrefillKind narrowed; arrival month / consulate never)", () => {
     const kinds = new Set(NATIONAL_VISA_FIELDS.map((f) => f.prefill).filter((k) => k !== null));
     expect([...kinds]).toEqual(["accountName"]);

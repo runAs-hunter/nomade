@@ -4,7 +4,7 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 
 ## What ships
 - **Source row (gate V1).** `us-new-york-national-visa-form` in `internal.sources` (migration `20261018102516_f12a_national_visa_form_source.sql`). It comes from `docs/sources/F12-visa-form-source.csv` and is mapped to `submit-application`. Its `content_hash` is the sha256 of the official PDF. The migration also adds `internal.sources.needs_review`.
-- **Content.** `src/lib/forms/national-visa.ts` holds the content, with `FORMS_CONTENT_VERSION`. It is generated verbatim from `docs/forms/visa-form-walkthrough.md` by `scripts/gen-forms-content.py`.
+- **Content.** `src/lib/forms/national-visa.ts` holds the content, with `FORMS_CONTENT_VERSION`. The walkthrough was signed off by Visa Ops on 2026-10-18. It is generated verbatim from `docs/forms/visa-form-walkthrough.md` by `scripts/gen-forms-content.py`.
 - **Template.** `public/forms/formulario_nazionale_visti2.pdf` is the official file, byte-for-byte. It has no AcroForm, so iOS draws at anchors.
 - **Link check.** `GET|POST /api/cron/check-sources` is extended with the pinned-hash compare (decision 6; see docs/sources.md). Since Cap's 18 Oct decision it is scheduled monthly in `vercel.json` (`0 4 1 * *` UTC) in **forms-only** mode: it checks the pinned form PDF only and never auto-stales other sources. A changed verified PDF (content-type `application/pdf` + `%PDF-` magic) or a 404/410/DNS failure sets `needs_review`; the pinned row is never staled, so the free walkthrough stays up. It can still be triggered by hand (full check without `?formsOnly=1`).
 - **API.** `GET /api/forms` and `GET /api/forms/:formId`, behind `requireAccess` and the active-account check. Both are flagged by `FORMS_ENABLED`, which defaults to off.
@@ -26,6 +26,11 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 - **Byte-exact strings:** the disclaimer `Preliminary guidance — not legal advice` and the translation label.
 - **Logs** carry ids, counts, `access` and `needsReview` only.
 - **Database:** nomade-dev only. Never nomade-prod.
+
+## Rev 4 changes (since rev 3; Visa Ops sign-off, 18 Oct 2026)
+- **`contentVersion`** is now `"visa-ops-national-visa-2026-10-18-2"` (was `"visa-ops-national-visa-2026-10-18"`). Re-fetch any cached copy whose version differs.
+- **Wording only (3 served strings):** `references["F-NY"].label` "Linked today" → "Linked on 2026-10-18"; stamps item 2 "the NY pages read today" → "read on 2026-10-18"; field 29 `markerReason` adds "The app shows the target month beside it as a reminder."
+- No keys, ids, markers, prefill rules, anchors or `copy` changed. The walkthrough's internal "Uncertain / for Visa Ops" list, the "Note for Studio" and the `ny-packet.md` stamps bullet are not served (never were); the generator now fails if internal text reaches served copy.
 
 ## Rev 3 changes (since rev 2; Cap's review of #40, 18 Oct 2026)
 - **`variant` gains the scope:** `variant { postId: "new-york", templateScope: "US-consulate:new-york", prefillPosts: ["new-york"], matchesConsulate, label }`, in list items and detail. Only a post in `prefillPosts` gets the PDF and pre-fill; the phone hides both for every other post and shows that post's own `consulate.officialUrl`. The server still strips the PDF, template and anchors for non-NY (rev 2), so this is belt and braces.
@@ -54,7 +59,7 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
 - **`prefill`** is now `{ available, reason: null | "consulate" | "needs_review", staleNotice }`. `staleNotice` is set only for New York with `needs_review`.
 - **List items** gain `variant` and `pdfAvailable`. `pdfAvailable` is true only for New York with an active row.
 - **Unchanged:** `reminder: "arrivalMonth"` stays on field 29 for every consulate.
-`FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18"`.
+`FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-2"`.
 
 ## Common
 - Auth: `Authorization: Bearer <Supabase access token>`, the same as `/api/journey/*`. Active accounts only.
@@ -80,7 +85,7 @@ Runbook: F12 Forms Library + Appointment-Day Packet, Phase 1 backend (`F12a-form
     "stepId": "submit-application",
     "sourceId": "us-new-york-national-visa-form",
     "scope": "US-consulate:new-york",
-    "contentVersion": "visa-ops-national-visa-2026-10-18",
+    "contentVersion": "visa-ops-national-visa-2026-10-18-2",
     "available": true,
     "needsReview": false,
     "variant": { "postId": "new-york", "templateScope": "US-consulate:new-york", "prefillPosts": ["new-york"], "matchesConsulate": true, "label": null },
@@ -99,7 +104,7 @@ The example below is for `consulate=new-york`. Non-NY differences are listed aft
 ```jsonc
 {
   "formId": "national-visa",
-  "contentVersion": "visa-ops-national-visa-2026-10-18",
+  "contentVersion": "visa-ops-national-visa-2026-10-18-2",
   "stepId": "submit-application",            // decision 4: "Form" row on this step
   "disclaimer": "Preliminary guidance — not legal advice",                      // byte-exact
   "translationLabel": "English translation — for understanding only. Submit the Italian original.", // byte-exact; top of translation + every page

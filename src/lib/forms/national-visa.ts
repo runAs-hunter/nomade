@@ -8,7 +8,8 @@
  * put. Not legal advice. Form values never reach the server (decision 2).
  */
 
-export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18";
+/** Bumped whenever the served copy changes. "-2": Visa Ops sign-off wording (18 Oct 2026). */
+export const FORMS_CONTENT_VERSION = "visa-ops-national-visa-2026-10-18-2";
 
 export const NATIONAL_VISA_FORM_ID = "national-visa";
 
@@ -122,7 +123,7 @@ export type FormReference = {
 export const NATIONAL_VISA_REFERENCES: Record<FormRef, FormReference> = {
   "F-NY": {
     sourceId: NATIONAL_VISA_SOURCE_ID,
-    label: "\"Domanda di visto Nazionale (D)\" with the \"Consolato Generale d'Italia New York\" header. Bilingual IT/EN, 4 pages. Linked today from the NY \"Visas forms\" page as \"Long term Visa Application Form\"",
+    label: "\"Domanda di visto Nazionale (D)\" with the \"Consolato Generale d'Italia New York\" header. Bilingual IT/EN, 4 pages. Linked on 2026-10-18 from the NY \"Visas forms\" page as \"Long term Visa Application Form\"",
     url: "https://consnewyork.esteri.it/wp-content/uploads/2023/06/formulario_nazionale_visti2.pdf",
     sha256: "d0631552d1e474c522911cc74d18c15fe474984ad79bd65ce3f5a880ee13ed20",
   },
@@ -243,7 +244,7 @@ export const NATIONAL_VISA_STAMPS = {
   "title": "Fees and stamps printed on the form",
   "items": [
     "[F-C] prints \"Modulo gratuito\" (the form itself is free). [F-C]",
-    "**Marca da bollo / revenue stamp:** no cited source requires one for US applicants. Neither form mentions one, nor do the NY pages read today or any active Nomade source row (all were searched for \"bollo\", \"marca\" and \"revenue stamp\" on 2026-10-18)."
+    "**Marca da bollo / revenue stamp:** no cited source requires one for US applicants. Neither form mentions one, nor do the NY pages read on 2026-10-18 or any active Nomade source row (all were searched for \"bollo\", \"marca\" and \"revenue stamp\" on 2026-10-18)."
   ]
 } as const;
 
@@ -856,7 +857,7 @@ export const NATIONAL_VISA_FIELDS: FormField[] = [
     "labelEn": "Intended date of arrival in the Schengen area",
     "asks": "Your intended arrival date in the Schengen area. [F-NY]",
     "marker": "copy-only",
-    "markerReason": "Asks for a full arrival date. Phase 1 holds only a month, so it cannot prefill this field without adding a day.",
+    "markerReason": "Asks for a full arrival date. Phase 1 holds only a month, so it cannot prefill this field without adding a day. The app shows the target month beside it as a reminder.",
     "ambiguous": false,
     "prefill": null,
     "prefillPart": null,
