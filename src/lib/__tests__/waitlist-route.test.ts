@@ -73,7 +73,7 @@ describe("waitlist copy", () => {
 
   it("homepage does not link the quiz or the removed claims", () => {
     const page = readFileSync(
-      path.join(process.cwd(), "src/app/page.tsx"),
+      path.join(process.cwd(), "src/app/waitlist/page.tsx"),
       "utf8",
     );
     expect(page).not.toMatch(/\/quiz/);
