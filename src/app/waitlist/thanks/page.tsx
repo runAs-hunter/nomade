@@ -54,7 +54,7 @@ export default async function WaitlistThanksPage({
   const pdfUrl = ctaSampleAssetUrl(source, sample.pdf);
 
   return (
-    <main className="min-h-screen bg-[var(--bg)]">
+    <main data-cta-scope="" className="min-h-screen bg-[var(--bg)]">
       <div className="app-container py-[var(--space-12)] md:py-16">
         <header className="mb-[var(--space-12)]">
           <Link href="/" className="text-display text-[var(--text-primary)]">

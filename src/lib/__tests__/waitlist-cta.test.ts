@@ -145,11 +145,14 @@ describe("CTA copy (0.5, locked)", () => {
     expect(css).toMatch(/--citron-deep:\s*#747624;/);
   });
 
-  it("highlights border-only and scopes a Citron Deep focus outline to the CTA section", () => {
+  it("highlights border-only and scopes a Citron Deep focus outline to the CTA section and thank-you page", () => {
     const cards = readFileSync(path.join(process.cwd(), "src/components/WaitlistCtaCards.tsx"), "utf8");
     expect(cards).not.toMatch(/shadow-|box-shadow|ring-/);
     expect(cards).toMatch(/transition-\[border-color\]/);
     expect(cards).toMatch(/<section\s+data-cta-scope=""/);
+    const thanks = readFileSync(path.join(process.cwd(), "src/app/waitlist/thanks/page.tsx"), "utf8");
+    expect(thanks).toMatch(/<main\s+data-cta-scope=""/);
+    expect(thanks).not.toMatch(/shadow-|box-shadow|ring-/);
     const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
     expect(css).not.toMatch(/--cta-highlight-ring/);
     expect(css).toMatch(/--cta-focus:\s*var\(--citron-deep\);/);
