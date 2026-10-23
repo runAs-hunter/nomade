@@ -24,3 +24,5 @@ Public landing-card previews live in `public/waitlist/preview/`:
 | appointment_packet | `appointment_packet-preview.png` | `out/png/0.4-ny-packet-p-1.png` (resized to 720 px wide) |
 
 A missing file is skipped (no image / no link), never an error.
+
+Guard: `src/lib/__tests__/waitlist-samples-guard.test.ts` extracts the text of every PDF here and fails on "draft row", "active row", or internal row ids (`us-…`). Re-run `npm test` after replacing a sample.
