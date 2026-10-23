@@ -64,7 +64,7 @@ function postJson(url: string, body: unknown): Request {
 
 describe("CTA copy (0.5, locked)", () => {
   it("matches the approved copy with Cap's overrides", () => {
-    expect(CTA_COPY.sectionHeading).toBe("Two things we're building next");
+    expect(CTA_COPY.sectionHeading).toBe("Two things we’re building next");
     expect(CTA_COPY.cards.forms_prefill).toEqual({
       title: "Your visa form, field by field",
       body: "The Italian national visa application, with a walkthrough of what each field asks for and an English translation for understanding only. You fill it in yourself; Nomade explains each field and links the official form.",
@@ -87,21 +87,26 @@ describe("CTA copy (0.5, locked)", () => {
     expect(CTA_COPY.signup.emailLabel).toBe("Email");
     expect(CTA_COPY.signup.button).toBe("Join the waitlist");
     expect(CTA_COPY.signup.microcopy).toBe(
-      "We'll email you when it's ready. No spam, no payment now.",
+      "We’ll email you when it’s ready. No spam, no payment now.",
     );
-    expect(CTA_COPY.thanks.heading).toBe("You're on the list.");
+    expect(CTA_COPY.thanks.heading).toBe("You’re on the list.");
     expect(CTA_COPY.thanks.sample.appointment_packet).toBe(
-      "Here's a sample New York appointment packet.",
+      "Here’s a sample New York appointment packet.",
     );
     expect(CTA_COPY.thanks.sample.forms_prefill).toBe(
-      "Here's a sample for a fictional applicant, Jane Sample: the official New York national visa application with only the name fields filled (1, Cognome, and 3, Nome/i), a reminder next to field 29, and a page explaining the sample. Every other field is filled in by hand. The field-by-field walkthrough and English translation are on the forms page.",
+      "Here’s a sample for a fictional applicant, Jane Sample: the official New York national visa application with only the name fields filled (1, Cognome, and 3, Nome/i), a reminder next to field 29, and a page explaining the sample. Every other field is filled in by hand. The field-by-field walkthrough and English translation come with Nomade Pro.",
     );
     expect(CTA_COPY.thanks.underSample).toBe(
       "This is a sample, not your form. Only the Italian original can be submitted.",
     );
-    expect(CTA_COPY.thanks.secondary).toBe(
-      "Want to help shape it? Reply to your confirmation email and tell us your consulate and appointment date.",
-    );
+    expect(CTA_COPY.thanks.sampleLink).toBe("See the sample (PDF)");
+    expect("secondary" in CTA_COPY.thanks).toBe(false);
+  });
+
+  it("uses curly apostrophes only and no removed lines", () => {
+    const json = JSON.stringify(CTA_COPY);
+    expect(json).not.toContain("'");
+    expect(json).not.toMatch(/confirmation email|forms page/i);
   });
 
   it("keeps the disclaimer byte-exact (U+2014)", () => {

@@ -71,14 +71,15 @@ export default async function WaitlistThanksPage({
             {CTA_COPY.thanks.sample[source]}
           </p>
 
-          {pdfAvailable ? (
+          {pdfAvailable && pages.length > 0 ? (
             <a
               href={pdfUrl}
               target="_blank"
               rel="noopener"
-              aria-label={sample.pdf}
-              data-sample-pdf={sample.pdf}
-              className="block mb-[var(--space-4)]"
+              aria-hidden="true"
+              tabIndex={-1}
+              data-sample-image-link={sample.pdf}
+              className="block mb-[var(--space-3)]"
             >
               {pages.map((page) => (
                 <Image
@@ -91,17 +92,26 @@ export default async function WaitlistThanksPage({
                   className="w-full h-auto rounded-[var(--radius-lg)] border border-[var(--border)] mb-[var(--space-3)]"
                 />
               ))}
-              {pages.length === 0 ? (
-                <span className="text-body text-[var(--accent)] underline">{sample.pdf}</span>
-              ) : null}
             </a>
           ) : null}
 
-          <p className="text-caption text-[var(--text-secondary)] mb-[var(--space-6)]">
+          {pdfAvailable ? (
+            <p className="mb-[var(--space-4)]">
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener"
+                data-sample-pdf={sample.pdf}
+                className="text-body text-[var(--accent)] underline"
+              >
+                {CTA_COPY.thanks.sampleLink}
+              </a>
+            </p>
+          ) : null}
+
+          <p className="text-caption text-[var(--text-secondary)]">
             {CTA_COPY.thanks.underSample} <span>{CTA_COPY.thanks.disclaimer}</span>
           </p>
-
-          <p className="text-body text-[var(--text-secondary)]">{CTA_COPY.thanks.secondary}</p>
         </section>
       </div>
     </main>

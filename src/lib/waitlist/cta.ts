@@ -33,7 +33,7 @@ export type SignupStepCopy = {
 };
 
 export const CTA_COPY = {
-  sectionHeading: "Two things we're building next",
+  sectionHeading: "Two things we’re building next",
   cards: {
     forms_prefill: {
       title: "Your visa form, field by field",
@@ -58,20 +58,19 @@ export const CTA_COPY = {
     } satisfies Record<CtaSource, string>,
     emailLabel: "Email",
     button: "Join the waitlist",
-    microcopy: "We'll email you when it's ready. No spam, no payment now.",
+    microcopy: "We’ll email you when it’s ready. No spam, no payment now.",
   },
   thanks: {
-    heading: "You're on the list.",
+    heading: "You’re on the list.",
     sample: {
       forms_prefill:
-        "Here's a sample for a fictional applicant, Jane Sample: the official New York national visa application with only the name fields filled (1, Cognome, and 3, Nome/i), a reminder next to field 29, and a page explaining the sample. Every other field is filled in by hand. The field-by-field walkthrough and English translation are on the forms page.",
-      appointment_packet: "Here's a sample New York appointment packet.",
+        "Here’s a sample for a fictional applicant, Jane Sample: the official New York national visa application with only the name fields filled (1, Cognome, and 3, Nome/i), a reminder next to field 29, and a page explaining the sample. Every other field is filled in by hand. The field-by-field walkthrough and English translation come with Nomade Pro.",
+      appointment_packet: "Here’s a sample New York appointment packet.",
     } satisfies Record<CtaSource, string>,
     underSample:
       "This is a sample, not your form. Only the Italian original can be submitted.",
+    sampleLink: "See the sample (PDF)",
     disclaimer: CTA_DISCLAIMER,
-    secondary:
-      "Want to help shape it? Reply to your confirmation email and tell us your consulate and appointment date.",
   },
 } as const;
 
