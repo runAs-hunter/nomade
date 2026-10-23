@@ -145,6 +145,19 @@ describe("CTA copy (0.5, locked)", () => {
     expect(css).toMatch(/--citron-deep:\s*#747624;/);
   });
 
+  it("highlights border-only and scopes a Citron Deep focus outline to the CTA section", () => {
+    const cards = readFileSync(path.join(process.cwd(), "src/components/WaitlistCtaCards.tsx"), "utf8");
+    expect(cards).not.toMatch(/shadow-|box-shadow|ring-/);
+    expect(cards).toMatch(/transition-\[border-color\]/);
+    expect(cards).toMatch(/<section\s+data-cta-scope=""/);
+    const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
+    expect(css).not.toMatch(/--cta-highlight-ring/);
+    expect(css).toMatch(/--cta-focus:\s*var\(--citron-deep\);/);
+    const rule = css.match(/\[data-cta-scope\] :focus-visible\s*\{([^}]*)\}/);
+    expect(rule?.[1]).toMatch(/outline:\s*2px solid var\(--cta-focus\);/);
+    expect(rule?.[1]).not.toMatch(/shadow|--accent/);
+  });
+
   it("parses only the two CTA sources", () => {
     expect(parseCtaSource("forms_prefill")).toBe("forms_prefill");
     expect(parseCtaSource("appointment_packet")).toBe("appointment_packet");

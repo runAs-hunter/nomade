@@ -61,6 +61,7 @@ export function WaitlistCtaCards({ previews }: Props) {
 
   return (
     <section
+      data-cta-scope=""
       aria-labelledby="cta-section-heading"
       className="mb-[var(--space-8)] mt-[var(--space-12)]"
     >
@@ -82,11 +83,13 @@ export function WaitlistCtaCards({ previews }: Props) {
               data-cta={source}
               data-highlighted={isHighlighted ? "true" : undefined}
               className={clsx(
-                "flex flex-col gap-[var(--space-4)] rounded-[var(--radius-xl)] border bg-[var(--surface)] p-[var(--space-6)] scroll-mt-[var(--space-12)]",
-                "transition-[box-shadow,border-color] duration-300",
+                "flex flex-col gap-[var(--space-4)] rounded-[var(--radius-xl)] bg-[var(--surface)] scroll-mt-[var(--space-12)]",
+                "transition-[border-color] duration-300",
+                // Border-only highlight (brand kit: no shadows). The 2px border
+                // trims 1px of padding so the card doesn't shift when it lights up.
                 isHighlighted
-                  ? "border-[var(--cta-highlight-border)] shadow-[0_0_0_4px_var(--cta-highlight-ring)]"
-                  : "border-[var(--border)]",
+                  ? "border-2 border-[var(--cta-highlight-border)] p-[calc(var(--space-6)-1px)]"
+                  : "border border-[var(--border)] p-[var(--space-6)]",
               )}
             >
               {previews[source] ? (

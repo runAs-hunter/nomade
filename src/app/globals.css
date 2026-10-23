@@ -17,8 +17,8 @@
   --citron-deep: #747624;     /* 4.8:1 on #FFFFFF, 4.5:1 on #F8F8F5 */
   --citron-tint: #EFF0C9;
   --cta-highlight-border: var(--citron-deep);
-  --cta-highlight-ring: var(--citron);
   --cta-link: var(--citron-deep);
+  --cta-focus: var(--citron-deep);  /* 4.8:1 vs #FFFFFF surface, 4.5:1 vs #F8F8F5 page */
 
   /* Surfaces */
   --bg: #F8F8F5;
@@ -62,8 +62,8 @@
   --accent-light: #1E1D3A;
   /* Citron on dark: 10.1:1 on #1A1A18 */
   --cta-highlight-border: var(--citron);
-  --cta-highlight-ring: var(--citron-deep);
   --cta-link: var(--citron);
+  --cta-focus: var(--citron);
 }
 
 /* ─── Base ────────────────────────────────────────────────────────────────── */
@@ -177,5 +177,12 @@ body {
 /* ─── Focus visible ──────────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* F12 CTA section + its inline signup step only: Citron Deep focus ring
+   (outline, no shadow). The site-wide indigo outline above is unchanged. */
+[data-cta-scope] :focus-visible {
+  outline: 2px solid var(--cta-focus);
   outline-offset: 2px;
 }
