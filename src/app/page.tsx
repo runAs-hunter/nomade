@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { WaitlistCtaCards } from "@/components/WaitlistCtaCards";
 import { WaitlistForm } from "@/components/WaitlistForm";
+import { publicPreviewExists } from "@/lib/waitlist/sample-access";
 import { WAITLIST_COPY } from "@/lib/waitlist/copy";
 
 export const metadata: Metadata = {
@@ -43,6 +45,13 @@ export default function LandingPage() {
         </p>
 
         <WaitlistForm />
+
+        <WaitlistCtaCards
+          previews={{
+            forms_prefill: publicPreviewExists("forms_prefill"),
+            appointment_packet: publicPreviewExists("appointment_packet"),
+          }}
+        />
 
         <footer className="mt-[var(--space-12)] text-caption text-[var(--text-tertiary)]">
           <p>{WAITLIST_COPY.disclaimer}</p>
