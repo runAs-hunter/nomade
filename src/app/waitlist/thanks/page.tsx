@@ -102,7 +102,7 @@ export default async function WaitlistThanksPage({
                 target="_blank"
                 rel="noopener"
                 data-sample-pdf={sample.pdf}
-                className="text-body text-[var(--accent)] underline"
+                className="text-body text-[var(--cta-link)] underline"
               >
                 {CTA_COPY.thanks.sampleLink}
               </a>

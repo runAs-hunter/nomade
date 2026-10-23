@@ -11,6 +11,15 @@
   --accent: #4945C2;
   --accent-light: #EEEEF9;
 
+  /* Brand kit v0.3 Citron (indigo retired). Scoped to the F12 CTA cards for
+     now; the site-wide --accent swap is a separate rollout item. */
+  --citron: #C9CC3F;
+  --citron-deep: #747624;     /* 4.8:1 on #FFFFFF, 4.5:1 on #F8F8F5 */
+  --citron-tint: #EFF0C9;
+  --cta-highlight-border: var(--citron-deep);
+  --cta-highlight-ring: var(--citron);
+  --cta-link: var(--citron-deep);
+
   /* Surfaces */
   --bg: #F8F8F5;
   --surface: #FFFFFF;
@@ -51,6 +60,10 @@
   --text-tertiary: #666666;
   --accent: #7B78E8;
   --accent-light: #1E1D3A;
+  /* Citron on dark: 10.1:1 on #1A1A18 */
+  --cta-highlight-border: var(--citron);
+  --cta-highlight-ring: var(--citron-deep);
+  --cta-link: var(--citron);
 }
 
 /* ─── Base ────────────────────────────────────────────────────────────────── */

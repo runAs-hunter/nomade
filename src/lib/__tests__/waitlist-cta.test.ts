@@ -132,6 +132,19 @@ describe("CTA copy (0.5, locked)", () => {
     expect(shown).not.toMatch(/checkout|App Store|price|\bbuy\b/i);
   });
 
+  it("uses Citron (brand kit v0.3), not the retired indigo accent", () => {
+    const files = [
+      "src/components/WaitlistCtaCards.tsx",
+      "src/app/waitlist/thanks/page.tsx",
+    ].map((f) => readFileSync(path.join(process.cwd(), f), "utf8"));
+    for (const src of files) {
+      expect(src).not.toMatch(/var\(--accent(-light)?\)|#4945C2|#7B78E8|indigo/i);
+    }
+    const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
+    expect(css).toMatch(/--citron:\s*#C9CC3F;/);
+    expect(css).toMatch(/--citron-deep:\s*#747624;/);
+  });
+
   it("parses only the two CTA sources", () => {
     expect(parseCtaSource("forms_prefill")).toBe("forms_prefill");
     expect(parseCtaSource("appointment_packet")).toBe("appointment_packet");

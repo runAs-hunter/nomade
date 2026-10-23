@@ -85,7 +85,7 @@ export function WaitlistCtaCards({ previews }: Props) {
                 "flex flex-col gap-[var(--space-4)] rounded-[var(--radius-xl)] border bg-[var(--surface)] p-[var(--space-6)] scroll-mt-[var(--space-12)]",
                 "transition-[box-shadow,border-color] duration-300",
                 isHighlighted
-                  ? "border-[var(--accent)] shadow-[0_0_0_4px_var(--accent-light)]"
+                  ? "border-[var(--cta-highlight-border)] shadow-[0_0_0_4px_var(--cta-highlight-ring)]"
                   : "border-[var(--border)]",
               )}
             >
