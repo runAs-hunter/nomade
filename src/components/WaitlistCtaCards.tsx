@@ -93,8 +93,8 @@ export function WaitlistCtaCards({ previews }: Props) {
                 <Image
                   src={ctaPreviewPublicPath(source)}
                   alt=""
-                  width={1200}
-                  height={630}
+                  width={720}
+                  height={932}
                   unoptimized
                   className="w-full h-auto rounded-[var(--radius-lg)] border border-[var(--border)]"
                 />

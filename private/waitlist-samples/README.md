@@ -20,7 +20,7 @@ Public landing-card previews live in `public/waitlist/preview/`:
 
 | Source | File | Studio original |
 |---|---|---|
-| forms_prefill | `forms_prefill-preview.png` | `out/png/0.2-forms-desktop-hero-1200x630.png` |
-| appointment_packet | `appointment_packet-preview.png` | `out/png/0.4-ny-packet-p-1.png` |
+| forms_prefill | `forms_prefill-preview.png` | `out/png/0.3-jane-sample-p-1.png` (resized to 720 px wide) |
+| appointment_packet | `appointment_packet-preview.png` | `out/png/0.4-ny-packet-p-1.png` (resized to 720 px wide) |
 
 A missing file is skipped (no image / no link), never an error.

@@ -89,7 +89,7 @@ export function ctaCardId(source: CtaSource): string {
 export const CTA_SAMPLES = {
   forms_prefill: {
     preview: "forms_prefill-preview.png",
-    previewSourceFile: "out/png/0.2-forms-desktop-hero-1200x630.png",
+    previewSourceFile: "out/png/0.3-jane-sample-p-1.png",
     pdf: "0.3-jane-sample-national-visa-form-SAMPLE.pdf",
     pages: ["0.3-jane-sample-p-1.png"],
   },
