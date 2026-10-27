@@ -9,7 +9,9 @@ import {
 import { buildChecklistView } from "@/lib/journey/checklist";
 import { indexChecklistSources, type ChecklistSourceRow } from "@/lib/journey/checklist-sources";
 import {
+  CHILDREN_COUNT_MAX,
   INTAKE_KEYS,
+  intakeQuestionsPayload,
   INTAKE_QUESTIONS,
   INTAKE_RULES_VERSION,
   applyIntakeRules,
@@ -281,3 +283,73 @@ describe("F11a storage + purge", () => {
 });
 
 afterEach(() => vi.unstubAllEnvs());
+
+describe("F11a v2 childrenCount follow-up", () => {
+  it("accepts integers 1–10 with a children family answer", () => {
+    for (const n of [1, 2, 10]) {
+      const r = parseIntakeAnswers({ family: "children", childrenCount: n }, NOW);
+      expect(r).toEqual({ ok: true, answers: { family: "children", childrenCount: n } });
+    }
+    expect(parseIntakeAnswers({ family: "spouse_children", childrenCount: 3 }, NOW)).toEqual({
+      ok: true,
+      answers: { family: "spouse_children", childrenCount: 3 },
+    });
+  });
+
+  it("rejects 0, 11, 2.5, \"2\", null, NaN", () => {
+    for (const v of [0, 11, 2.5, "2", null, Number.NaN, -1]) {
+      const r = parseIntakeAnswers({ family: "children", childrenCount: v }, NOW);
+      expect(r.ok).toBe(false);
+    }
+  });
+
+  it("drops the count silently when family has no children (or is absent)", () => {
+    for (const family of ["solo", "spouse", "unsure"]) {
+      expect(parseIntakeAnswers({ family, childrenCount: 2 }, NOW)).toEqual({ ok: true, answers: { family } });
+    }
+    expect(parseIntakeAnswers({ childrenCount: 2 }, NOW)).toEqual({ ok: true, answers: {} });
+    // Still validated before dropping.
+    expect(parseIntakeAnswers({ family: "spouse", childrenCount: 11 }, NOW).ok).toBe(false);
+  });
+
+  it("does not count toward completion", () => {
+    const five: IntakeAnswers = {
+      incomeSource: "freelancer",
+      incomeThreshold: "yes",
+      housing: "lease",
+      family: "children",
+      arrivalMonth: null,
+    };
+    expect(isIntakeComplete(five)).toBe(true);
+    expect(isIntakeComplete({ ...five, childrenCount: 3 })).toBe(true);
+    const { arrivalMonth: _drop, ...four } = five;
+    void _drop;
+    expect(isIntakeComplete({ ...four, childrenCount: 3 })).toBe(false);
+    expect(INTAKE_KEYS).not.toContain("childrenCount");
+  });
+
+  it("advertises followUps only on family", () => {
+    const qs = intakeQuestionsPayload();
+    expect(qs.map((q) => q.key)).toEqual(INTAKE_QUESTIONS.map((q) => q.key));
+    const family = qs.find((q) => q.key === "family") as { followUps?: unknown };
+    expect(family.followUps).toEqual([
+      { key: "childrenCount", min: 1, max: CHILDREN_COUNT_MAX, showWhen: ["spouse_children", "children"] },
+    ]);
+    for (const q of qs.filter((x) => x.key !== "family")) expect("followUps" in q).toBe(false);
+  });
+
+  it("rules output is unchanged by the count (no rule uses it yet)", () => {
+    for (const pathId of PATHS) {
+      expect(applyIntakeRules(pathId, { family: "children", childrenCount: 4 }, NOW)).toEqual(
+        applyIntakeRules(pathId, { family: "children" }, NOW),
+      );
+    }
+    expect(INTAKE_RULES_VERSION).toBe("f11-rules-2026-10-16");
+  });
+
+  it("purge: the count lives in journey_intake.answers, which cascades with the case", () => {
+    expect(migrationSql).toMatch(
+      /case_id uuid primary key references internal\.journey_cases \(id\) on delete cascade/,
+    );
+  });
+});
