@@ -19,6 +19,8 @@
 <link rel="stylesheet" href="/landing/css/style.css">
 </head>
 <body>
+<script>try{if(!sessionStorage.getItem("nm-intro")&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.classList.add("has-intro")}catch(e){}</script>
+<div class="intro" id="intro" hidden><div class="intro-veil"></div><svg class="intro-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M12 52V35A16 16 0 0 1 44 35V52H32.5V35A4.5 4.5 0 0 0 23.5 35V52Z" fill="currentColor"/><circle cx="48" cy="17.5" r="6.5" fill="#C9CC3F"/></svg><button type="button" class="intro-skip mono" id="intro-skip">Skip →</button></div>
 <div class="bar mono"><span>N—00</span><span>Pre-release · iOS · Launch pricing held for early reservations</span><button class="link" data-tier="topbar" data-open>Reserve →</button></div>
 <header class="nav">
   <a class="logo" href="#top" aria-label="Nomade home"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M12 52V35A16 16 0 0 1 44 35V52H32.5V35A4.5 4.5 0 0 0 23.5 35V52Z" fill="currentColor"/><circle cx="48" cy="17.5" r="6.5" fill="#C9CC3F"/></svg>nomade</a>
@@ -90,8 +92,10 @@
   </div>
 </section>
 
+
 <section class="problem" id="problem">
-  <header class="sh reveal"><span class="mono">01 / Problem</span><h2>The paperwork is the hard part.</h2><p>Italy is the easy decision. The process is where people stall.</p></header>
+<!-- MEDIA: full-bleed band (Positano) -->
+<figure class="m-band m-band-head"><picture><source type="image/avif" srcset="/landing/media/positano-640.avif 640w,/landing/media/positano-1280.avif 1280w,/landing/media/positano-1920.avif 1920w" sizes="100vw"><source type="image/webp" srcset="/landing/media/positano-640.webp 640w,/landing/media/positano-1280.webp 1280w,/landing/media/positano-1920.webp 1920w" sizes="100vw"><img src="/landing/media/positano-1280.webp" loading="lazy" decoding="async" width="1920" height="1280" alt="Positano"></picture><div class="m-over"><header class="sh"><span class="mono">01 / Problem</span><h2>The paperwork is the hard part.</h2><p>Italy is the easy decision. The process is where people stall.</p></header></div><figcaption class="mono">Positano</figcaption></figure>
   <ol class="specs">
     <li class="reveal"><span class="mono idx">01.1</span><h3>Appointments, months out.</h3><p>Consulate visa slots in the U.S. can book up far in advance — and you can only apply at the one that covers where you live.</p></li>
     <li class="reveal"><span class="mono idx">01.2</span><h3>Every consulate, a different list.</h3><p>The same visa can come with different document requirements, formats, and proofs depending on which consulate you're assigned.</p></li>
@@ -99,6 +103,15 @@
     <li class="reveal"><span class="mono idx">01.4</span><h3>Apostilles, translations, insurance.</h3><p>Records need apostilles and certified translations, and health insurance that doesn't meet consulate requirements is a common reason to redo an application.</p></li>
   </ol>
 </section>
+
+<!-- MEDIA: ITALIA text mask over looping video (Cala Fuili) -->
+<figure class="vmask" id="vmask" data-word="VISTO"><!-- toggle: set data-word="ITALIA" to switch back -->
+  <video class="vm-video" muted playsinline loop preload="none" data-poster="/landing/media/cala-fuili-poster.webp" aria-hidden="true" data-lazy-video>
+    <source data-src="/landing/media/cala-fuili-720.webm" type="video/webm"><source data-src="/landing/media/cala-fuili-720.mp4" type="video/mp4"></video>
+  <svg class="vm-cut" viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><defs><mask id="vm-m" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="5200" height="4300"><rect x="-2000" y="-2000" width="5200" height="4300" fill="#fff"/><text x="600" y="232" text-anchor="middle" textLength="1140" lengthAdjust="spacingAndGlyphs">VISTO</text></mask></defs><rect x="-2000" y="-2000" width="5200" height="4300" fill="#EAE7E1" mask="url(#vm-m)"/></svg>
+  <span class="vm-word" role="img" aria-label="Visto"></span>
+  <figcaption class="mono">Cala Fuili</figcaption>
+</figure>
 
 <section class="how" id="how">
   <header class="sh reveal"><span class="mono">02 / System</span><h2>One app. Your path, exactly.</h2></header>
@@ -108,6 +121,9 @@
     <article class="reveal"><div class="diagram d3" aria-hidden="true"><i></i></div><span class="mono idx">C — Track</span><h3>Track every step to permesso</h3><p>A living timeline with deadlines and reminders, from preparing for your consulate appointment to the permesso di soggiorno after you land.</p></article>
   </div>
 </section>
+
+<!-- MEDIA: triptych (Dolomites, Tuscany, Rome) -->
+<div class="m-tri"><figure class="m-card"><picture><source type="image/avif" srcset="/landing/media/tre-cime-480.avif 480w,/landing/media/tre-cime-800.avif 800w,/landing/media/tre-cime-1200.avif 1200w" sizes="(max-width:700px) 100vw, 33vw"><source type="image/webp" srcset="/landing/media/tre-cime-480.webp 480w,/landing/media/tre-cime-800.webp 800w,/landing/media/tre-cime-1200.webp 1200w" sizes="(max-width:700px) 100vw, 33vw"><img src="/landing/media/tre-cime-800.webp" loading="lazy" decoding="async" width="1200" height="1500" alt="Tre Cime di Lavaredo"></picture><figcaption class="mono">Tre Cime di Lavaredo</figcaption></figure><figure class="m-card"><picture><source type="image/avif" srcset="/landing/media/pienza-480.avif 480w,/landing/media/pienza-800.avif 800w,/landing/media/pienza-1200.avif 1200w" sizes="(max-width:700px) 100vw, 33vw"><source type="image/webp" srcset="/landing/media/pienza-480.webp 480w,/landing/media/pienza-800.webp 800w,/landing/media/pienza-1200.webp 1200w" sizes="(max-width:700px) 100vw, 33vw"><img src="/landing/media/pienza-800.webp" loading="lazy" decoding="async" width="1200" height="1500" alt="Pienza"></picture><figcaption class="mono">Pienza</figcaption></figure><figure class="m-card"><picture><source type="image/avif" srcset="/landing/media/rome-480.avif 480w,/landing/media/rome-800.avif 800w,/landing/media/rome-1200.avif 1200w" sizes="(max-width:700px) 100vw, 33vw"><source type="image/webp" srcset="/landing/media/rome-480.webp 480w,/landing/media/rome-800.webp 800w,/landing/media/rome-1200.webp 1200w" sizes="(max-width:700px) 100vw, 33vw"><img src="/landing/media/rome-800.webp" loading="lazy" decoding="async" width="1200" height="1500" alt="Rome"></picture><figcaption class="mono">Rome</figcaption></figure></div>
 
 <section class="pricing" id="pricing">
   <header class="sh reveal"><span class="mono">03 / Pricing</span><h2>Launch pricing.</h2><p>Reserve now and we'll hold these prices for you at launch. No payment today.</p></header>
@@ -141,10 +157,12 @@
     <details class="reveal"><summary>What does reserving mean?</summary><p>You leave your email; we hold launch pricing and let you know when the app opens. No card, no commitment.</p></details>
   </div>
 </section>
+
 </main>
 
 <footer class="foot">
-  <div class="f-top"><p class="f-cta">Your path to Italy,<br><span class="mute">one checklist at a time.</span></p><button class="btn btn-acc" data-tier="footer" data-open>Reserve early access →</button></div>
+<!-- MEDIA: footer band (Vernazza) with f-top overlaid -->
+<figure class="m-band m-band-foot"><picture><source type="image/avif" srcset="/landing/media/vernazza-640.avif 640w,/landing/media/vernazza-1280.avif 1280w,/landing/media/vernazza-1920.avif 1920w" sizes="100vw"><source type="image/webp" srcset="/landing/media/vernazza-640.webp 640w,/landing/media/vernazza-1280.webp 1280w,/landing/media/vernazza-1920.webp 1920w" sizes="100vw"><img src="/landing/media/vernazza-1280.webp" loading="lazy" decoding="async" width="1920" height="1280" alt="Vernazza"></picture><div class="m-over"><div class="f-top"><p class="f-cta">Your path to Italy,<br><span class="mute">one checklist at a time.</span></p><button class="btn btn-acc" data-tier="footer" data-open>Reserve early access →</button></div></div><figcaption class="mono">Vernazza</figcaption></figure>
   <p class="f-big" aria-hidden="true">nomade</p>
   <div class="f-row mono"><span>© 2026 Nomade · Pre-release</span><span>Preliminary guidance — not legal advice. Not affiliated with any government.</span><span>N—05 / End</span></div>
 </footer>

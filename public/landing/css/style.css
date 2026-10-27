@@ -203,3 +203,54 @@ input:focus,select:focus{outline:none;border-color:var(--graphite);box-shadow:0 
 /* citron accent tuning */
 .v-head{color:var(--acc-d)}.v-photo{background:linear-gradient(#d4d6a8,#bfc28a)}.visa{box-shadow:0 0 0 1px rgba(78,80,16,.18),0 1px 2px rgba(0,0,0,.18),0 8px 20px -8px rgba(0,0,0,.25)}
 .seq-bar i{background:var(--graphite)}.seq-bar{height:3px;background:var(--acc-soft)}
+/* ===== Italy media (task/landing-italy-media) ===== */
+@font-face{font-family:'Nomade Slab';src:url(/landing/fonts/NomadeSlab-VISTO.woff2) format('woff2');font-display:swap}
+/* intro: natura-style aperture that zooms into the hero passport */
+.intro{position:fixed;inset:0;z-index:200;pointer-events:none}
+.has-intro .intro{display:block}
+.intro-veil{position:absolute;inset:0;background:var(--graphite);--r:0px;--cx:50%;--cy:50%;
+-webkit-mask:radial-gradient(circle at var(--cx) var(--cy),transparent var(--r),#000 calc(var(--r) + 1px));mask:radial-gradient(circle at var(--cx) var(--cy),transparent var(--r),#000 calc(var(--r) + 1px))}
+.intro-mark{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;color:var(--bone)}
+.intro-skip{position:absolute;right:var(--pad);bottom:24px;pointer-events:auto;background:none;border:1px solid rgba(234,231,225,.4);color:var(--bone);padding:8px 12px;border-radius:2px}
+.intro-skip:hover{background:var(--acc);border-color:var(--acc);color:var(--graphite)}
+html:not(.has-intro) .intro{display:none!important}
+/* figures */
+.m-band,.vmask,.m-card{margin:0;position:relative;overflow:hidden}
+.m-band picture,.m-card picture{display:block;height:100%}
+.m-band img,.m-card img{display:block;width:100%;height:100%;object-fit:cover}
+.m-band{height:clamp(320px,72vh,760px);border-bottom:var(--rule);background:var(--concrete)}
+.m-band-foot{height:clamp(240px,46vh,520px);border-bottom:0}
+.m-band figcaption,.m-card figcaption,.vmask figcaption{position:absolute;left:var(--pad);bottom:18px;color:var(--bone);text-shadow:0 1px 8px rgba(0,0,0,.45)}
+.m-band img{transform:scale(1.08);transition:transform 1.6s var(--ease)}.m-band.in img{transform:none}
+/* ITALIA mask */
+.vmask{aspect-ratio:4/1;padding-bottom:40px;box-sizing:content-box;border-bottom:var(--rule);background:var(--bone)}
+.vm-video{position:absolute;inset:0 0 40px;width:100%;height:calc(100% - 40px);object-fit:cover;object-position:50% 80%}
+.vm-cut{position:absolute;inset:0 0 40px;width:100%;height:calc(100% - 40px)}
+.vm-cut text{font:400 262px/1 'Nomade Slab',var(--sans)}
+.vmask[data-font=geist] .vm-cut text{font:800 270px/1 var(--sans);letter-spacing:-.04em}
+.vm-word{position:absolute;inset:0}
+.vmask figcaption{color:var(--graphite);text-shadow:none;bottom:12px}
+/* triptych */
+.m-tri{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(17,17,17,.16);border-bottom:var(--rule)}
+.m-card{aspect-ratio:4/5;background:var(--concrete)}
+.m-card img{transition:transform 1.2s var(--ease)}.m-card:hover img{transform:scale(1.04)}
+@media (max-width:700px){.m-tri{grid-template-columns:1fr}.m-card{aspect-ratio:4/3}}
+@media (prefers-reduced-motion:reduce){.m-band img,.m-card img{transform:none!important;transition:none}}
+/* v3: headers overlaid on bands, over the sky (top left) */
+.m-over{position:absolute;left:0;right:0;top:0;padding:clamp(24px,4vw,56px) var(--pad) 0;z-index:2;pointer-events:none}
+.m-over>*{pointer-events:auto}
+.m-band-head,.m-band-foot{isolation:isolate}
+.m-band-head::after,.m-band-foot::after{content:"";position:absolute;inset:0 0 auto;height:62%;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(234,231,225,.55),rgba(234,231,225,.18) 55%,rgba(234,231,225,0))}
+.problem>.m-band-head{margin:calc(-1 * clamp(80px,10vw,150px)) calc(-1 * var(--pad)) clamp(48px,6vw,88px);height:clamp(460px,82vh,820px)}
+.m-band-head img{object-position:30% 0%}
+.m-band-head .sh{margin:0;border-top-color:rgba(17,17,17,.75)}
+.m-band-head .sh>span,.m-band-head .sh p{color:var(--graphite)}
+.m-band-head .sh h2,.m-band-head .sh p{text-shadow:0 1px 14px rgba(234,231,225,.6)}
+.foot>.m-band-foot{margin:-72px calc(-1 * var(--pad)) 56px;height:clamp(420px,70vh,720px)}
+.m-band-foot img{object-position:20% 0%}
+.m-band-foot .f-top{align-items:start}
+.m-band-foot .f-cta{color:var(--graphite);text-shadow:0 1px 14px rgba(234,231,225,.6)}
+.m-band-foot .f-cta .mute{color:var(--grey)}
+@media (max-width:1000px){.problem>.m-band-head{height:clamp(520px,86vh,760px)}.m-band-head img{object-position:12% 0%}.m-band-foot img{object-position:8% 0%}}
+.m-band-head .sh{display:block;max-width:min(620px,48vw)}.m-band-head .sh>span{display:block;margin-bottom:14px}.m-band-head .sh p{margin-top:14px}
+@media (max-width:1000px){.m-band-head .sh{max-width:none}}
