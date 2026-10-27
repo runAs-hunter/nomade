@@ -103,7 +103,7 @@ export async function POST(request: Request): Promise<NextResponse<WaitlistBody>
 
     // Optional fields must never fail a signup. Try the richest row first,
     // then fall back on any non-duplicate error: without the fake-door columns
-    // (migration 20261012120000 not applied yet), then email only.
+    // (migration 20261022120000 not applied yet), then email only.
     const attempts: Row[] = [];
     if (hasAny(fakeDoor)) attempts.push({ email, ...attribution, ...fakeDoor });
     attempts.push({ email, ...attribution });
