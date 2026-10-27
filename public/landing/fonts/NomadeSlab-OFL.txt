@@ -1,0 +1,6 @@
+NomadeSlab-VISTO.woff2 is a modified (subset: V I S T O A L) version of Alfa Slab One.
+Renamed per the Reserved Font Name clause of the license.
+
+Copyright 2016 The Alfa Slab One Project Authors (http://www.jmsole.cl | info@jmsole.cl), with Reserved Font Name "Alfa Slab".
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is available with a FAQ at: https://openfontlicense.org (full text: see OFL.txt in this folder, same license).

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party bundles (GSAP, minified)
+    "public/landing/vendor/**",
     // Agent / local tooling trees committed under the repo (not app source)
     ".claude/**",
     ".codex/**",
