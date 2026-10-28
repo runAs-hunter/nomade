@@ -170,7 +170,8 @@
 
 <dialog id="modal" aria-labelledby="m-title">
   <form id="reserve" method="dialog" novalidate>
-    <div class="m-bar mono"><span id="m-tier">Early access</span><button type="button" class="x" data-close aria-label="Close">Close ×</button></div>
+    <div inert aria-hidden="true" class="hp" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none"><input type="text" name="hp_x7" id="hp_x7" value="" tabindex="-1" autocomplete="off" aria-hidden="true"></div>
+    <div class="m-bar mono"><span id="m-tier">Early access</span><button type="button" class="x" data-close autofocus aria-label="Close">Close ×</button></div>
     <div class="m-body">
       <h2 id="m-title">We're opening soon.</h2>
       <p>Leave your email and we'll hold launch pricing for you.</p>
@@ -180,7 +181,6 @@
       <label><span class="mono">03 · Target move date</span>
         <select name="move_date"><option value="">Choose one</option><option>Within 6 months</option><option>6–12 months</option><option>1–2 years</option><option>Just exploring</option></select></label>
       <input type="hidden" name="tier">
-      <input type="text" name="company" tabindex="-1" aria-label="Leave this field empty" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0">
       <p class="mono" style="opacity:.7">We only use your email to contact you about Nomade. <a href="/privacy">Privacy</a>.</p>
       <p class="err mono" role="alert"></p>
       <button class="btn btn-acc" type="submit">Hold my spot →</button>

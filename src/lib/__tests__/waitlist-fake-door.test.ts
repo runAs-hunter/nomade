@@ -15,6 +15,11 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { POST } from "@/app/api/waitlist/route";
 import { resetServerEnvCache } from "@/lib/env";
+import {
+  HONEYPOT_FIELD,
+  isHoneypotFilled,
+  LEGACY_HONEYPOT_FIELD,
+} from "@/lib/waitlist/fake-door";
 
 const DEV_URL = "https://bgdrzdlenmwbpalnjiqg.supabase.co";
 const PROD_URL = "https://whjzynfsifrtrxlylrww.supabase.co";
@@ -72,7 +77,7 @@ describe("POST /api/waitlist (fake-door fields)", () => {
     path: "digital_nomad",
     move_date: "6–12 months",
     source: "nomadevisa_landing",
-    company: "",
+    hp_x7: "",
     ts: "2026-10-12T09:00:00.000Z",
     utm_source: "x",
   };
@@ -123,11 +128,34 @@ describe("POST /api/waitlist (fake-door fields)", () => {
     expect(insertMock).toHaveBeenCalledWith({ email: "a@b.co", ...NO_ATTRIBUTION });
   });
 
-  it("honeypot: fake success, no insert", async () => {
-    const res = await POST(post({ ...LANDING, company: "Acme" }));
+  it("honeypot (hp_x7 filled): fake success, no insert", async () => {
+    const res = await POST(post({ ...LANDING, hp_x7: "Acme" }));
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("legacy honeypot (company filled, cached old page): fake success, no insert", async () => {
+    const { hp_x7: _omit, ...oldPage } = LANDING;
+    void _omit;
+    const res = await POST(post({ ...oldPage, company: "Acme" }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("empty or whitespace honeypots (new and legacy) store the signup", async () => {
+    const res = await POST(post({ ...LANDING, hp_x7: "  ", company: "" }));
+    expect(res.status).toBe(200);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("old page with an empty legacy company field still stores the signup", async () => {
+    const { hp_x7: _omit, ...oldPage } = LANDING;
+    void _omit;
+    const res = await POST(post({ ...oldPage, company: "" }));
+    expect(res.status).toBe(200);
+    expect(insertMock).toHaveBeenCalledTimes(1);
   });
 
   it("still refuses nomade-prod with fake-door fields", async () => {
@@ -156,7 +184,28 @@ describe("nomadevisa.com landing (public/landing)", () => {
   it("posts to same-origin /api/waitlist, checks ok, has a honeypot", () => {
     expect(js).toContain("FORM_ENDPOINT: '/api/waitlist'");
     expect(js).toContain("j.ok !== true");
-    expect(html).toContain('name="company"');
+    expect(html).toContain('name="hp_x7"');
+  });
+  it("honeypot is autofill-proof: non-semantic name, off-screen, not type=hidden, no label", () => {
+    expect(html).not.toContain('name="company"');
+    const tag = html.match(/<input[^>]*name="hp_x7"[^>]*>/)?.[0] ?? "";
+    expect(tag).toContain('type="text"');
+    expect(tag).toContain('id="hp_x7"');
+    expect(tag).toContain('autocomplete="off"');
+    expect(tag).toContain('tabindex="-1"');
+    expect(tag).toContain('aria-hidden="true"');
+    expect(tag).not.toMatch(/aria-label|placeholder/);
+    // Off-screen, inert wrapper: never focusable (dialog initial focus would
+    // otherwise land on it as the first control), still submitted by FormData.
+    const wrap = html.match(/<div inert[^>]*class="hp"[^>]*>\s*<input[^>]*name="hp_x7"/)?.[0] ?? "";
+    expect(wrap).toContain("left:-9999px");
+    expect(wrap).toContain('aria-hidden="true"');
+    expect(html).not.toMatch(/<label[^>]*for="hp_x7"/);
+    // Chrome infers a label from neighbouring text; placed after the email
+    // field it picked up "We only use your email" and predicted EMAIL_ADDRESS.
+    // As the first control in the form it has no semantic neighbours.
+    expect(html.indexOf('name="hp_x7"')).toBeGreaterThan(html.indexOf('<form id="reserve"'));
+    expect(html.indexOf('name="hp_x7"')).toBeLessThan(html.indexOf('name="email"'));
   });
   it("self-hosts fonts and GSAP and sets canonical", () => {
     expect(html).not.toMatch(/fonts\.googleapis|jsdelivr/);
@@ -166,5 +215,21 @@ describe("nomadevisa.com landing (public/landing)", () => {
     for (const e of ["hero_step", "tier_click", "reserve_submit", "reserve_error", "faq_open"]) {
       expect(js).toContain(`'${e}'`);
     }
+  });
+});
+
+describe("isHoneypotFilled", () => {
+  it("flags the new and the legacy field names", () => {
+    expect(isHoneypotFilled({ [HONEYPOT_FIELD]: "x" })).toBe(true);
+    expect(isHoneypotFilled({ [LEGACY_HONEYPOT_FIELD]: "x" })).toBe(true);
+    expect(isHoneypotFilled({ [HONEYPOT_FIELD]: "", [LEGACY_HONEYPOT_FIELD]: "x" })).toBe(true);
+  });
+  it("treats empty, whitespace, missing and non-string values as human", () => {
+    expect(isHoneypotFilled({})).toBe(false);
+    expect(isHoneypotFilled({ [HONEYPOT_FIELD]: "", [LEGACY_HONEYPOT_FIELD]: "" })).toBe(false);
+    expect(isHoneypotFilled({ [HONEYPOT_FIELD]: "   " })).toBe(false);
+    expect(isHoneypotFilled({ [HONEYPOT_FIELD]: 1, [LEGACY_HONEYPOT_FIELD]: null })).toBe(false);
+    expect(isHoneypotFilled(null)).toBe(false);
+    expect(isHoneypotFilled("hp_x7")).toBe(false);
   });
 });
