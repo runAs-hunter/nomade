@@ -55,9 +55,24 @@ export function sanitizeFakeDoorFields(payload: unknown): FakeDoorFields {
   };
 }
 
-/** Hidden "company" input. Humans leave it empty. */
+/**
+ * Hidden anti-bot input. Humans leave it empty. The name is deliberately
+ * non-semantic so browser autofill (which keys on name/id/label words like
+ * "company", "name", "email") never classifies or fills it.
+ */
+export const HONEYPOT_FIELD = "hp_x7";
+/**
+ * Pre-rename field name. Still treated as a bot signal for one release so
+ * cached copies of the old landing page behave the same. Remove after that.
+ */
+export const LEGACY_HONEYPOT_FIELD = "company";
+
+function isFilled(v: unknown): boolean {
+  return typeof v === "string" && v.trim() !== "";
+}
+
 export function isHoneypotFilled(payload: unknown): boolean {
   if (payload === null || typeof payload !== "object") return false;
-  const v = (payload as Record<string, unknown>).company;
-  return typeof v === "string" && v.trim() !== "";
+  const b = payload as Record<string, unknown>;
+  return isFilled(b[HONEYPOT_FIELD]) || isFilled(b[LEGACY_HONEYPOT_FIELD]);
 }
