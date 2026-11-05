@@ -166,3 +166,14 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* F12 CTA / thank-you: Citron Deep focus (landing uses public/landing/css) */
+:root {
+  --citron: #C9CC3F;
+  --citron-deep: #747624;
+  --cta-focus: var(--citron-deep);
+}
+[data-cta-scope] :focus-visible {
+  outline: 2px solid var(--cta-focus);
+  outline-offset: 2px;
+}
