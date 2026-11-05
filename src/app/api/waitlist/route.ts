@@ -40,7 +40,8 @@ function success(): NextResponse<WaitlistBody> {
  * Public homepage waitlist. Stores the address plus best-effort attribution
  * (utm_* + referrer host) and optional fake-door fields (tier, path, move_date,
  * source). Invalid optional values are dropped, never rejected. A filled
- * "company" honeypot gets a fake success and nothing is stored.
+ * honeypot ("hp_x7", or the legacy "company" for one release) gets a fake
+ * success and nothing is stored.
  * No IP, no user agent. Does not send email. Refuses nomade-prod. nomade-dev (and local) only.
  */
 export async function POST(request: Request): Promise<NextResponse<WaitlistBody>> {
@@ -60,7 +61,8 @@ export async function POST(request: Request): Promise<NextResponse<WaitlistBody>
     return failure(400);
   }
 
-  // Honeypot: bots fill the hidden "company" field. Pretend success, store nothing.
+  // Honeypot: bots fill the hidden "hp_x7" field (legacy: "company").
+  // Pretend success, store nothing.
   if (isHoneypotFilled(payload)) {
     return success();
   }

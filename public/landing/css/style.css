@@ -254,3 +254,38 @@ html:not(.has-intro) .intro{display:none!important}
 @media (max-width:1000px){.problem>.m-band-head{height:clamp(520px,86vh,760px)}.m-band-head img{object-position:12% 0%}.m-band-foot img{object-position:8% 0%}}
 .m-band-head .sh{display:block;max-width:min(620px,48vw)}.m-band-head .sh>span{display:block;margin-bottom:14px}.m-band-head .sh p{margin-top:14px}
 @media (max-width:1000px){.m-band-head .sh{max-width:none}}
+/* ===== mobile fixes (task/landing-mobile-fixes) ===== */
+/* iOS Safari: viewport-fit=cover + header flush at top:0 with the safe area inside its own background.
+   env() is 0 on desktop, so desktop layout is unchanged. */
+:root{--pad:max(clamp(20px,3.4vw,48px),env(safe-area-inset-left,0px),env(safe-area-inset-right,0px))}
+html{background:var(--bone)}
+.nav{top:0;margin-top:0;transform:none;padding-top:calc(12px + env(safe-area-inset-top,0px))}
+@media (max-width:1000px){
+ /* opaque header: no content showing through, no backdrop-filter repaint glitches on iOS sticky */
+ .nav{background:var(--bone);-webkit-backdrop-filter:none;backdrop-filter:none}
+ /* hero: stack the scene (passport + checklist) above the copy in flow, so they can never overlap */
+ .stage{display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:24px;
+  top:calc(61px + env(safe-area-inset-top,0px));height:calc(100vh - 61px - env(safe-area-inset-top,0px));height:calc(100svh - 61px - env(safe-area-inset-top,0px))}
+ .scene{position:relative;left:auto;top:auto;width:100%;height:auto;flex:1 1 0;min-height:0;container-type:size;
+  --ch:131px;--gap:20px;--cw:min(300px,calc(100vw - 2 * var(--pad)));
+  --W:max(64px,min(30vw,200px,calc((100cqh - var(--ch) - var(--gap) - 12px) / 1.56)))}
+ .passport{left:50%;top:auto;bottom:calc(var(--gap) + var(--ch) + var(--W) * .16)}
+ .shadow{left:calc(50% - var(--W) * 1.15);top:auto;bottom:calc(var(--gap) + var(--ch) - var(--W) * .26)}
+ .check{left:50%;margin-left:calc(var(--cw) / -2);top:auto;bottom:var(--gap);width:var(--cw)}
+ .check li{height:26px;padding:0;white-space:nowrap}
+ .hero-copy{position:relative;left:auto;right:auto;bottom:auto;flex:none;margin:0 var(--pad)}
+ .static-seq .stage{height:calc(100vh - 61px);height:calc(100svh - 61px)}
+}
+@media (max-width:600px){
+ .stage{top:calc(57px + env(safe-area-inset-top,0px));height:calc(100vh - 57px - env(safe-area-inset-top,0px));height:calc(100svh - 57px - env(safe-area-inset-top,0px))}
+ .scene{--W:max(64px,min(34vw,180px,calc((100cqh - var(--ch) - var(--gap) - 12px) / 1.56)))}
+}
+/* short or narrow phones: tighten the copy so the passport keeps room */
+@media (max-width:600px) and (max-height:720px),(max-width:359px){
+ .scene{--ch:111px;--gap:18px}
+ .check li{height:22px}
+ h1{font-size:34px;margin-bottom:8px}
+ .lede{font-size:13px;line-height:1.45;margin-bottom:12px}
+ .cta-row .btn{height:44px}
+}
+@media (max-width:600px) and (max-height:600px){.hero-copy .lede{display:none}}
