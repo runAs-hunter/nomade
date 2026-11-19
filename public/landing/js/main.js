@@ -13,14 +13,64 @@ function trackEvent(name, props = {}) {
 const modal = document.getElementById('modal');
 const form = document.getElementById('reserve');
 const names = { free: 'T—01 · Path Finder · Free', pathpack_79: 'T—02 · Path Pack · $79', review_199: 'T—03 · Path Pack + Review · $199' };
+const CTA_HEADINGS = {
+  forms_prefill: 'Get early access to the field-by-field form guide',
+  appointment_packet: 'Get early access to the appointment packet',
+};
+const DEFAULT_TITLE = "We're opening soon.";
+const DEFAULT_BODY = "Leave your email and we'll hold launch pricing for you.";
+const DEFAULT_SUBMIT = 'Hold my spot →';
+const CTA_SUBMIT = 'Join the waitlist';
+const CTA_MICRO = "We'll email you when it's ready. No spam, no payment now.";
+
+function utmPayload() {
+  const out = {};
+  const q = new URLSearchParams(location.search);
+  ['utm_source','utm_medium','utm_campaign','utm_content'].forEach(k => { if (q.get(k)) out[k] = q.get(k); });
+  return out;
+}
+
+function openReserve({ tier, signupSource } = {}) {
+  form.tier.value = tier || '';
+  form.signup_source.value = signupSource || '';
+  const title = form.querySelector('#m-title');
+  const body = form.querySelector('.m-body > p');
+  const submit = form.querySelector('button[type=submit]');
+  if (signupSource && CTA_HEADINGS[signupSource]) {
+    document.getElementById('m-tier').textContent = 'Early access · Pro sample';
+    title.textContent = CTA_HEADINGS[signupSource];
+    body.textContent = CTA_MICRO;
+    submit.textContent = CTA_SUBMIT;
+    // Hide path/move_date for CTA fake-door (email-only step per 0.5 copy)
+    form.querySelectorAll('label').forEach((lab, i) => { if (i > 0) lab.hidden = true; });
+  } else {
+    document.getElementById('m-tier').textContent = names[tier] || 'Early access · Launch pricing';
+    title.textContent = DEFAULT_TITLE;
+    body.textContent = DEFAULT_BODY;
+    submit.textContent = DEFAULT_SUBMIT;
+    form.querySelectorAll('label').forEach(lab => { lab.hidden = false; });
+  }
+  form.querySelector('.m-body').hidden = false; form.querySelector('.m-done').hidden = true;
+  form.querySelector('.err').textContent = '';
+  modal.showModal();
+}
+
 document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
   const tier = b.dataset.tier;
   trackEvent('tier_click', { tier });
-  form.tier.value = tier;
-  document.getElementById('m-tier').textContent = names[tier] || 'Early access · Launch pricing';
-  form.querySelector('.m-body').hidden = false; form.querySelector('.m-done').hidden = true;
-  modal.showModal();
+  openReserve({ tier });
 }));
+
+document.querySelectorAll('[data-cta-open]').forEach(b => b.addEventListener('click', () => {
+  const cta = b.dataset.ctaOpen;
+  trackEvent('cta_click', { cta });
+  try {
+    const body = { cta, ...utmPayload() };
+    fetch('/api/waitlist/cta-tap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
+  } catch (_) {}
+  openReserve({ signupSource: cta });
+}));
+
 modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-close]')) modal.close(); });
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -28,19 +78,47 @@ form.addEventListener('submit', async e => {
   if (!form.email.checkValidity()) { err.textContent = 'Please enter a valid email.'; form.email.focus(); return; }
   err.textContent = '';
   const data = Object.fromEntries(new FormData(form)); data.ts = new Date().toISOString(); data.source = 'nomadevisa_landing'; try { if (document.referrer) data.referrer_host = new URL(document.referrer).hostname; } catch (_) {}
-  const q = new URLSearchParams(location.search); ['utm_source','utm_medium','utm_campaign','utm_content'].forEach(k => { if (q.get(k)) data[k] = q.get(k); });
-  trackEvent('reserve_submit', { tier: data.tier, path: data.path, move_date: data.move_date });
+  Object.assign(data, utmPayload());
+  if (!data.signup_source) delete data.signup_source;
+  trackEvent('reserve_submit', { tier: data.tier, path: data.path, move_date: data.move_date, signup_source: data.signup_source || null });
   const btn = form.querySelector('button[type=submit]'); btn.disabled = true;
   if (NOMADE_CONFIG.FORM_ENDPOINT) {
     try {
       const r = await fetch(NOMADE_CONFIG.FORM_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (r.status === 429) {
+        const ra = r.headers.get('Retry-After') || '60';
+        throw new Error('rate_limited:' + ra);
+      }
       const j = await r.json().catch(() => null);
       if (!r.ok || !j || j.ok !== true) throw new Error('HTTP ' + r.status);
-    } catch (x) { trackEvent('reserve_error', { message: String(x) }); err.textContent = "Couldn't save that email. Try again."; btn.disabled = false; return; }
+      if (data.signup_source === 'forms_prefill' || data.signup_source === 'appointment_packet') {
+        location.assign('/waitlist/thanks?source=' + encodeURIComponent(data.signup_source));
+        return;
+      }
+    } catch (x) {
+      trackEvent('reserve_error', { message: String(x) });
+      err.textContent = String(x).includes('rate_limited')
+        ? 'Too many attempts. Wait a minute and try again.'
+        : "Couldn't save that email. Try again.";
+      btn.disabled = false;
+      return;
+    }
   }
   btn.disabled = false;
   form.querySelector('.m-body').hidden = true; form.querySelector('.m-done').hidden = false;
 });
+
+/* ?cta=forms_prefill|appointment_packet → scroll + border-only Citron Deep highlight */
+(function deepLinkCta() {
+  const q = new URLSearchParams(location.search);
+  const cta = q.get('cta');
+  if (cta !== 'forms_prefill' && cta !== 'appointment_packet') return;
+  const el = document.getElementById('cta-' + cta);
+  if (!el) return;
+  el.classList.add('is-highlight');
+  const go = () => { try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) { el.scrollIntoView(); } };
+  if (document.readyState === 'complete') setTimeout(go, 50); else addEventListener('load', () => setTimeout(go, 50));
+})();
 
 /* Scroll reveals */
 const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 });

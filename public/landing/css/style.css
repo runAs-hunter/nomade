@@ -289,3 +289,20 @@ html{background:var(--bone)}
  .cta-row .btn{height:44px}
 }
 @media (max-width:600px) and (max-height:600px){.hero-copy .lede{display:none}}
+
+/* ===== F12 Phase 0 CTA cards (task/landing-cta-cards) ===== */
+:root{--citron:#C9CC3F;--citron-deep:#747624;--cta-focus:var(--citron-deep)}
+.building{padding:clamp(72px,10vw,140px) var(--pad);border-bottom:var(--rule)}
+.cta-cards{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,3vw,36px);margin-top:clamp(36px,5vw,64px)}
+.cta-card{border:var(--rule-d);background:var(--bone2);display:flex;flex-direction:column;transition:border-color .2s ease}
+.cta-card.is-highlight{border-color:var(--citron-deep)}
+.cta-preview{aspect-ratio:935/600;overflow:hidden;border-bottom:var(--rule);background:var(--concrete)}
+.cta-preview img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.cta-copy{padding:clamp(20px,2.4vw,32px);display:flex;flex-direction:column;gap:14px;flex:1}
+.cta-copy h3{font:500 22px/1.2 var(--sans);letter-spacing:-.02em;margin:0}
+.cta-copy p{margin:0;color:var(--grey);font-size:15px}
+.cta-copy .btn{align-self:flex-start;margin-top:4px;white-space:normal;height:auto;min-height:48px;padding:12px 18px;text-align:left;line-height:1.25}
+.cta-small{opacity:.7;font-size:12px!important}
+.cta-under{margin:clamp(28px,4vw,48px) 0 0;max-width:52ch;color:var(--grey);font-size:14px}
+[data-cta-scope] :focus-visible{outline:2px solid var(--cta-focus);outline-offset:2px}
+@media (max-width:800px){.cta-cards{grid-template-columns:1fr}}
